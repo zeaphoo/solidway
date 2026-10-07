@@ -156,7 +156,7 @@ The class decides whether a target is retried, rotated or held. Errors caused by
 
 ## Status
 
-| | |
+|  | Status |
 |---|---|
 | Open-source gateway | Being split out |
 | Enterprise edition | Being split out |
