@@ -1,0 +1,309 @@
+# Packaging
+
+## GitHub Release 产物（推荐分发方式）
+
+发布只由 **`v*` 标签**触发（`.github/workflows/release.yml`），一次 tag 产出并挂载：
+
+| 平台 | 产物 | 构建脚本 |
+|---|---|---|
+| Linux 服务 | `solidway_<ver>-1_<arch>.deb`、`solidway-<ver>-1.<arch>.rpm`（systemd） | `scripts/package-linux.sh` |
+| Linux 客户端 | `solidway-app_<ver>_<arch>.deb`、`solidway-app_<ver>_<arch>.AppImage`（均自带网关） | `scripts/package-linux-app.sh` |
+| Windows 客户端 | `solidway-app_<ver>_x64-setup.exe`（NSIS）、`solidway-app_<ver>_x64.msi`、`solidway-app_<ver>_x64_portable.zip` | `scripts/package-windows.sh` |
+| macOS 客户端 | `solidway-app_<ver>_<arch>.dmg`（x86_64 / arm64 各一份） | `scripts/package-mac.sh` |
+
+命名约定：**客户端产物统一 `solidway-app_<ver>_<arch>[.<ext>]`**，服务包统一 `solidway_<ver>-<rev>_<arch>`；
+架构名按平台惯例（Linux `amd64`/`arm64`、Windows `x64`、macOS `x86_64`/`arm64`）。
+
+流程：
+
+```bash
+# 1) 版本号在三处保持一致（脚本会校验，否则 tag 构建直接失败）
+./scripts/check-release-version.sh          # 应输出当前版本，如 0.1.0
+# 2) 打 tag 并推送（tag 必须等于 v<version>）
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+版本一致性由 `scripts/check-release-version.sh` 在构建前强制校验（`app/tauri.conf.json`
+与全部 crates / app 的 `Cargo.toml`，且 tag 必须等于 `v<version>`）。
+
+macOS 构建需要仓库 secrets（缺失即失败，不产出未签名包）：
+
+| secret | 说明 |
+|---|---|
+| `MAC_CERT_P12_BASE64` | `AKSL Software` 及其 CA 完整链的 p12（base64） |
+| `MAC_CERT_PASSWORD` | p12 口令 |
+| `MAC_SIGN_IDENTITY`（可选） | 默认 `AKSL Software` |
+
+只想演练而不发 Release：手动触发 `Release` 工作流，`publish=false`（可选 `with_mac=false`
+跳过 macOS，若尚未配置 secrets）。
+
+`app/tauri.conf.json` 的 `identifier` 为 `xyz.solidway`（域名 `solidway.xyz` 的反向 DNS）。发布前没有历史用户，因此**不做数据目录迁移**：老开发者本机的 `com.solidway.app` 目录需要手工改名或删除。
+
+**Linux 客户端依赖服务包**：客户端不内嵌 `solidway`，按 PATH 使用 `deb`/`rpm` 安装的
+`/usr/bin/solidway`。因此安装顺序是「先服务包、后客户端」（见下文「与 Tauri 桌面应用的关系」）。
+
+## Linux service packaging
+
+产出 systemd 服务安装包：`.deb` 与 `.rpm`。安装后包含：
+
+- `/usr/bin/solidway`
+- `/usr/lib/systemd/system/solidway.service`
+- 系统用户 / 组 `solidway`
+- 数据目录 `/var/lib/solidway`
+
+## 构建
+
+安装 Rust 打包工具：
+
+```bash
+cargo install cargo-deb --locked
+cargo install cargo-generate-rpm --locked
+```
+
+然后：
+
+```bash
+./scripts/package-linux.sh
+```
+
+默认输出到 `dist/linux/`：
+
+```text
+solidway_<version>-1_<arch>.deb
+solidway-<version>-1.<arch>.rpm
+```
+
+脚本会先构建 `web/dist`，再执行 `cargo build --release -p solidway`。
+二进制动态链接 glibc，建议在**目标发行版或目标最低版本**的构建机上打包，
+避免 GLIBC 版本不兼容。
+
+如果前端已构建，可跳过：
+
+```bash
+SKIP_WEB_BUILD=1 ./scripts/package-linux.sh
+```
+
+## 安装
+
+```bash
+sudo apt install ./solidway_0.1.0-1_amd64.deb
+# 或
+sudo rpm -ivh solidway-0.1.0-1.x86_64.rpm
+```
+
+安装脚本会创建 `solidway` 用户、初始化 `/var/lib/solidway`、启用并启动服务。
+
+首次启动的 admin 引导令牌在 journal 中：
+
+```bash
+sudo journalctl -u solidway -n 100 | grep 'solidway: bootstrap'
+```
+
+## 运维
+
+```bash
+systemctl status solidway
+systemctl restart solidway
+systemctl stop solidway
+journalctl -u solidway -f
+```
+
+数据目录：
+
+```text
+/var/lib/solidway/
+├── solidway.db
+├── usage_detail.db
+├── master.key
+└── tls/
+```
+
+卸载包不会删除 `/var/lib/solidway`（包含数据库、master key 和 TLS 私钥）。
+彻底删除前请先备份，然后手工：
+
+```bash
+sudo rm -rf /var/lib/solidway
+sudo userdel solidway
+sudo groupdel solidway
+```
+
+内置 HTTPS 需要 80/443 时，unit 已授予 `CAP_NET_BIND_SERVICE`；如果前面有反向代理，
+可以删除 unit 中的 `AmbientCapabilities` / `CapabilityBoundingSet` 两行。
+
+## 与 Tauri 桌面应用的关系
+
+本目录只打 **headless service**。桌面应用 `app/` 是独立的 Tauri 2 项目，
+其安装包由 Tauri bundler 生成（`deb` / `rpm` / `AppImage` 等）。
+
+桌面应用运行时会按以下顺序寻找 `solidway`：
+
+1. 应用可执行文件同目录
+2. 开发期仓库 `target/<profile>/solidway`
+3. `PATH`
+
+桌面客户端包已**自带** `solidway`（打包进 `/usr/lib/Solidway/solidway`），因此单装客户端即可运行：
+壳的查找顺序是「可执行文件同目录 → 应用资源目录 → 开发期 target → PATH」。service 包因此是**可选**的
+——需要 systemd 常驻（服务器形态）时才装；两者同时安装时，客户端仍优先使用自带的副本，互不干扰。
+
+桌面应用自身用 Tauri CLI 打包，脚本封装了构建、网关注入与产物收集：
+
+```bash
+./scripts/package-linux-app.sh          # 产出 dist/linux-app/ 下的 deb + AppImage
+# 前端已构建时可跳过：SKIP_WEB_BUILD=1 ./scripts/package-linux-app.sh
+```
+
+产物：
+
+```text
+solidway-app_<version>_<arch>.deb      # 包名 solidway-app（避免与服务包 solidway 同名）
+solidway-app_<version>_<arch>.AppImage  # 单文件，自带 webkit 与网关
+```
+
+两者都把网关二进制打进 `usr/lib/Solidway/solidway`（bundle.resources），只装客户端即可运行；
+`deb` 的 `Depends` 已声明 `libwebkit2gtk-4.1-0` / `libgtk-3-0` / `libayatana-appindicator3-1`，
+AppImage 则自带 webkit，不依赖系统版本。
+
+Linux 构建需要 Tauri 的系统依赖（`libwebkit2gtk-4.1-dev`、`libayatana-appindicator3-dev`、
+`librsvg2-dev`、`libgtk-3-dev`、`patchelf` 等），以 Tauri 2 的 Linux 前置要求为准。
+
+
+## Windows desktop app
+
+产出 NSIS 安装包、MSI（可选）与便携 zip；`solidway.exe` 与 `Solidway.exe` **必须同目录**
+（桌面壳按「应用可执行文件同目录」查找网关），两类产物都已处理：
+
+| 形态 | 做法 |
+|---|---|
+| 安装包（NSIS / MSI） | `app/tauri.windows.conf.json` 的 `bundle.resources` 把 `solidway.exe` 装到安装目录 |
+| 便携 zip | 直接放 `Solidway.exe` + `solidway.exe` + `README.txt`，免安装 |
+
+```bash
+./scripts/package-windows.sh
+# 前端已构建时可跳过：SKIP_WEB_BUILD=1 ./scripts/package-windows.sh
+# 没有 WiX 下载条件时只出 NSIS：TAURI_BUNDLES=nsis ./scripts/package-windows.sh
+```
+
+前置：Windows + Git Bash；`cargo` / `pnpm` / `node` / `cargo tauri`（`cargo install tauri-cli --locked`）。
+脚本会先构建 `web/dist`、`cargo build --release -p solidway`，把 `solidway.exe` 临时放进
+`app/`（`.gitignore` 已忽略），再让 Tauri bundler 打安装包。
+
+默认输出到 `dist/windows/`：
+
+```text
+solidway-app_<version>_x64-setup.exe    # NSIS
+solidway-app_<version>_x64.msi          # WiX（TAURI_BUNDLES 含 msi 时）
+solidway-app_<version>_x64_portable.zip # 便携版（两个 exe 同目录）
+```
+
+### 未签名与运行前提
+
+- **未做代码签名**：首次运行安装包/便携版时 SmartScreen 会提示「未知发布者」，
+  选择「更多信息 → 仍要运行」；企业环境可用 GPO/信任策略放行。
+- 需要 **WebView2 运行时**：Windows 10 1803+ 通常随 Edge 已安装；缺失时安装包会
+  引导安装（Tauri 的 bootstrapper），便携版需用户自行安装。
+- 数据目录为 `%APPDATA%\xyz.solidway`；Windows 上该目录不得位于共享目录（主密钥依赖目录 ACL）。
+
+## macOS desktop app
+
+产出**自签名**的 `Solidway.app` 与 `solidway-app_<version>_<arch>.dmg`（AKSL Software +
+hardened runtime，禁 ad-hoc；不做 Apple 公证）。mac 侧是**纯桌面应用**：随开随用、
+退出即停，`app/` 启动并托管 `solidway` 子进程；没有 launchd 服务包。
+
+### 构建前置检查项（逐项确认）
+
+- [ ] `cargo` / `pnpm` / `node` / `codesign` / `hdiutil` / `security` 可用；
+- [ ] `cargo tauri --version` 可用；缺失时执行 `cargo install tauri-cli --locked`；
+- [ ] Keychain 中有 `AKSL Software` 代码签名身份（`security find-identity -v -p codesigning`），
+      缺失时脚本直接失败（**不提供跳过签名开关、不回退 ad-hoc**）；
+- [ ] `app/tauri.conf.json` 的 `version` 与 `crates/solidway`、`crates/solidway_api`、
+      `crates/solidway_core`、`app` 的版本一致（脚本会校验，不一致即失败）；
+- [ ] `web/dist/index.html` 存在（不设置 `SKIP_WEB_BUILD=1` 时脚本会先构建）。
+
+```bash
+./scripts/package-mac.sh
+# 前端已构建时可跳过：SKIP_WEB_BUILD=1 ./scripts/package-mac.sh
+```
+
+默认输出到 `dist/mac/`：
+
+```text
+Solidway.app
+solidway-app_<version>_<arch>.dmg
+```
+
+打包顺序固定（顺序错会产生不含 `solidway` 或未签名的坏 dmg）：
+`cargo build --release -p solidway` → `cargo tauri build --bundles app` →
+post-copy `solidway` 到 `Contents/MacOS/` → 内层 Mach-O 先签、`.app` 外层后签 →
+从**已签名**的 `.app` 用 `hdiutil` 生成 dmg → 挂载 dmg 断言内含 `solidway` 且
+`codesign --verify --deep --strict` 通过。**不得**使用 `cargo tauri build --bundles dmg`
+（bundler 会重建 `.app`，覆盖 post-copy 与签名结果）。
+
+### 安装
+
+```bash
+ditto dist/mac/Solidway.app /Applications/Solidway.app
+open /Applications/Solidway.app
+```
+
+签名自检（构建机）：
+
+```bash
+codesign --verify --deep --strict dist/mac/Solidway.app
+codesign -dv --verbose=2 dist/mac/Solidway.app   # Authority=AKSL Software、flags 含 runtime
+```
+
+### Gatekeeper / quarantine 说明
+
+未做 Apple 公证，`spctl -a -vv dist/mac/Solidway.app` **预期不通过**（`source=Unnotarized Developer ID`
+或类似），这是已接受的下限，不是构建失败。
+
+经浏览器下载 / AirDrop 的 dmg 会带 quarantine：
+
+- 首选：访达右键 `Solidway.app` →「打开」→ 在对话框再确认「打开」；
+- `xattr` 兜底（确认来源可信后）：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Solidway.app
+```
+
+### 冒烟与数据目录
+
+`data_root` 固定为 `~/Library/Application Support/xyz.solidway`（不读配置文件、
+不支持应用专属环境变量覆盖）。冒烟会写真实数据目录，按下面程序隔离：
+
+```bash
+DATA="$HOME/Library/Application Support/xyz.solidway"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+[ -d "$DATA" ] && mv "$DATA" "$DATA.bak-$STAMP"   # 备份真实数据
+# 启动 app → 状态转「运行中」→ 控制台可达（端口以 solidway: listening addr= 为准，缺省 6565）
+# → 退出 app → 确认 solidway 子进程已停止
+```
+
+冒烟后的处理：
+
+- **验证通过**：删除本次冒烟产生的 `"$DATA"`，再恢复备份：
+  `[ -d "$DATA.bak-$STAMP" ] && rm -rf "$DATA" && mv "$DATA.bak-$STAMP" "$DATA"`；
+- **验证失败**：保留 `"$DATA"` 与 `bak-$STAMP` 供排查，不要删除；
+- **备份堆积**：`bak-<时间戳>` 只保留**最近 2 份**，更早的在确认最新备份可恢复后手工删除：
+
+```bash
+ls -dt "$HOME/Library/Application Support"/xyz.solidway.bak-* 2>/dev/null | tail -n +3
+# 确认上面列出的都是可删旧备份后：| xargs rm -rf
+```
+
+### CI 与分发边界
+
+- **CI 只在 `v*` 标签上构建 mac 产物**（ADR 0018）：签名身份经 secrets 导入临时 keychain，
+  构建后 `codesign --verify --deep --strict` 自检，只上传 `.dmg`；分支 push 不构建 mac 包。
+- secrets 缺失时 job 直接失败，**不提供跳过签名开关、不回退 ad-hoc**（防止未签名产物流出）。
+- 本机 `./scripts/package-mac.sh` 与 CI 走同一脚本，本地出包口径完全一致；`dist/mac/` 产物
+  可自行分发。
+- 若 GitHub 下线 `macos-13`，把 Intel leg 换成当时的 Intel 镜像（如 `macos-15-intel`）。
+- Windows 产物在 `windows-latest` 上构建（同为 tag 触发），不做签名、不依赖 secrets；安装包内
+  `solidway.exe` 的落点由 `bundle.resources` 保证，首次发布建议实机确认安装目录。
+
+### 与 Linux service 包的关系
+
+- mac 只分发桌面 app（无 launchd / 无系统服务），与 `dist/linux/` 的 deb/rpm 互不影响；
+- `solidway` 二进制**随 `.app` 分发**（`Contents/MacOS/solidway`），不依赖 `PATH` 或已安装
+  Linux service 包；桌面壳定位顺序仍为「应用可执行文件同目录 → 开发期工作区产物 → `PATH`」。

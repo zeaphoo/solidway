@@ -1,0 +1,47 @@
+{
+  "model": "claude-sonnet-4-6",
+  "max_tokens": 1024,
+  "system": [
+    {"type": "text", "text": "You are a helpful assistant.", "cache_control": {"type": "ephemeral"}}
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "What is in this image?"},
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="}}
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {"type": "thinking", "thinking": "I should use the weather tool.", "signature": "sig_123"},
+        {"type": "tool_use", "id": "toolu_1", "name": "get_weather", "input": {"city": "Beijing"}}
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {"type": "tool_result", "tool_use_id": "toolu_1", "content": [{"type": "text", "text": "sunny"}], "is_error": false}
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "Get weather for a city",
+      "input_schema": {"type": "object", "properties": {"city": {"type": "string"}}},
+      "cache_control": {"type": "ephemeral"}
+    }
+  ],
+  "tool_choice": {"type": "auto"},
+  "thinking": {"type": "enabled", "budget_tokens": 2048},
+  "stop_sequences": ["END"],
+  "temperature": 0.2,
+  "top_p": 0.9,
+  "top_k": 40,
+  "stream": true,
+  "metadata": {"user_id": "user_1"},
+  "output_config": {"effort": "medium"},
+  "vendor_flag": true
+}

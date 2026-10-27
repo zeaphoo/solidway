@@ -1,0 +1,15 @@
+{
+  "model": "m",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": "hi"
+    }
+  ],
+  "stream": true,
+  "store": false,
+  "include": [
+    "reasoning.encrypted_content"
+  ]
+}

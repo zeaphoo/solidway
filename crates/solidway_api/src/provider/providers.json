@@ -1,0 +1,3548 @@
+{
+  "source": "models.dev",
+  "generated_at": "2026-10-23T05:36:00.158Z",
+  "service_account_host_patterns": [
+    "{prefix}.googleapis.com"
+  ],
+  "providers": [
+    {
+      "key": "lingyiwanwu",
+      "name": "01.AI",
+      "name_zh": "零一万物",
+      "base_url_template": "https://api.lingyiwanwu.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.lingyiwanwu.com/docs",
+      "kind": "api",
+      "default_api_formats": [
+        "chat_completions"
+      ]
+    },
+    {
+      "key": "alibaba",
+      "name": "Alibaba",
+      "name_zh": "阿里云",
+      "base_url_template": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.alibabacloud.com/help/en/model-studio/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "alibaba-cn",
+      "name": "Alibaba (China)",
+      "name_zh": "阿里云（中国）",
+      "base_url_template": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.alibabacloud.com/help/en/model-studio/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "alibaba-coding-plan",
+      "name": "Alibaba Coding Plan",
+      "name_zh": "阿里云编程套餐",
+      "base_url_template": "https://coding-intl.dashscope.aliyuncs.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.alibabacloud.com/help/en/model-studio/coding-plan",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan"
+    },
+    {
+      "key": "alibaba-coding-plan-cn",
+      "name": "Alibaba Coding Plan (China)",
+      "name_zh": "阿里云编程套餐（中国）",
+      "base_url_template": "https://coding.dashscope.aliyuncs.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://help.aliyun.com/zh/model-studio/coding-plan",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan"
+    },
+    {
+      "key": "alibaba-token-plan",
+      "name": "Alibaba Token Plan",
+      "name_zh": "阿里云 Token 套餐",
+      "base_url_template": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.alibabacloud.com/help/en/model-studio/token-plan-overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "token_plan"
+    },
+    {
+      "key": "alibaba-token-plan-cn",
+      "name": "Alibaba Token Plan (China)",
+      "name_zh": "阿里云 Token 套餐（中国）",
+      "base_url_template": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.alibabacloud.com/help/zh/model-studio/token-plan-overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "token_plan"
+    },
+    {
+      "key": "anthropic",
+      "name": "Anthropic",
+      "name_zh": "Anthropic",
+      "base_url_template": "https://api.anthropic.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "x-api-key",
+      "featured": true,
+      "doc": "https://docs.anthropic.com/en/docs/about-claude/models",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "azure",
+      "name": "Azure",
+      "name_zh": "Azure",
+      "base_url_template": "https://{resource}.openai.azure.com",
+      "base_url_variables": [
+        {
+          "name": "resource",
+          "label": "providers.vars.resource",
+          "kind": "host-label",
+          "example": "my-resource",
+          "required": true
+        }
+      ],
+      "auth_scheme": "api-key",
+      "featured": true,
+      "doc": "https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api",
+      "path_template": "/openai/deployments/{deployment}/{endpoint}?api-version={api_version}",
+      "path_variables": [
+        {
+          "name": "deployment",
+          "label": "providers.params.deployment",
+          "kind": "path-segment",
+          "example": "gpt-4o-prod",
+          "required": true
+        },
+        {
+          "name": "api_version",
+          "label": "providers.params.apiVersion",
+          "kind": "azure-api-version",
+          "example": "2024-10-21",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "azure-v1",
+      "name": "Azure (v1 API)",
+      "name_zh": "Azure（v1 API）",
+      "base_url_template": "https://{resource}.openai.azure.com",
+      "base_url_variables": [
+        {
+          "name": "resource",
+          "label": "providers.vars.resource",
+          "kind": "host-label",
+          "example": "my-resource",
+          "required": true
+        }
+      ],
+      "auth_scheme": "api-key",
+      "featured": true,
+      "doc": "https://learn.microsoft.com/en-us/azure/ai-foundry/openai/api-version-lifecycle",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api",
+      "path_template": "/openai/v1/{endpoint}",
+      "path_variables": []
+    },
+    {
+      "key": "baichuan",
+      "name": "Baichuan AI",
+      "name_zh": "百川智能",
+      "base_url_template": "https://api.baichuan-ai.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.baichuan-ai.com/docs/api",
+      "kind": "api",
+      "default_api_formats": [
+        "chat_completions"
+      ]
+    },
+    {
+      "key": "qianfan",
+      "name": "Baidu Qianfan",
+      "name_zh": "百度智能云千帆",
+      "base_url_template": "https://qianfan.baidubce.com/v2",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://cloud.baidu.com/doc/WENXINWORKSHOP/s/Fm2vrveyu",
+      "kind": "api",
+      "default_api_formats": [
+        "chat_completions"
+      ]
+    },
+    {
+      "key": "bailing",
+      "name": "Bailing",
+      "name_zh": "蚂蚁百灵",
+      "base_url_template": "https://api.tbox.cn/api/llm/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://alipaytbox.yuque.com/sxs0ba/ling/intro",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "bedrock-anthropic",
+      "name": "Bedrock (Anthropic)",
+      "name_zh": "Bedrock（Anthropic）",
+      "base_url_template": "https://bedrock-runtime.{region}.amazonaws.com",
+      "base_url_variables": [
+        {
+          "name": "region",
+          "label": "providers.vars.region",
+          "kind": "host-label",
+          "example": "us-east-1",
+          "required": true
+        }
+      ],
+      "auth_scheme": "sigv4",
+      "featured": true,
+      "doc": "https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "enterprise",
+      "note": "providers.presetNotes.bedrock",
+      "path_template": "/model/{model}:{action}",
+      "path_actions": {
+        "unary": "invoke",
+        "stream": "invoke-with-response-stream"
+      },
+      "aws_service": "bedrock",
+      "anthropic_version": "bedrock-2023-05-31"
+    },
+    {
+      "key": "cerebras",
+      "name": "Cerebras",
+      "name_zh": "Cerebras",
+      "base_url_template": "https://api.cerebras.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://inference-docs.cerebras.ai/models/overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "cohere",
+      "name": "Cohere",
+      "name_zh": "Cohere",
+      "base_url_template": "https://api.cohere.ai/compatibility/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.cohere.com/docs/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "deepinfra",
+      "name": "Deep Infra",
+      "name_zh": "DeepInfra",
+      "base_url_template": "https://api.deepinfra.com/v1/openai",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://deepinfra.com/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "deepseek",
+      "name": "DeepSeek",
+      "name_zh": "DeepSeek",
+      "base_url_template": "https://api.deepseek.com",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://api-docs.deepseek.com/quick_start/pricing",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "fireworks-ai",
+      "name": "Fireworks AI",
+      "name_zh": "Fireworks AI",
+      "base_url_template": "https://api.fireworks.ai/inference/v1/",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://fireworks.ai/docs/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "google-openai",
+      "name": "Google Gemini (OpenAI Compatible)",
+      "name_zh": "Google Gemini（OpenAI 兼容）",
+      "base_url_template": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://ai.google.dev/gemini-api/docs/openai",
+      "kind": "api",
+      "default_api_formats": [
+        "chat_completions"
+      ]
+    },
+    {
+      "key": "groq",
+      "name": "Groq",
+      "name_zh": "Groq",
+      "base_url_template": "https://api.groq.com/openai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://console.groq.com/docs/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "xfyun",
+      "name": "iFlytek Spark",
+      "name_zh": "讯飞星火",
+      "base_url_template": "https://spark-api-open.xf-yun.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.xfyun.cn/doc/spark/HTTP%E8%B0%83%E7%94%A8%E6%96%87%E6%A1%A3.html",
+      "kind": "api",
+      "default_api_formats": [
+        "chat_completions"
+      ]
+    },
+    {
+      "key": "kimi-code-plan-global",
+      "name": "Kimi For Coding (kimi.ai)",
+      "name_zh": "Kimi For Coding（国际）",
+      "base_url_template": "https://api.kimi.ai/coding/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.kimi.ai/code/docs/en/kimi-code/models.html",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan",
+      "note": "providers.presetNotes.kimiCoding"
+    },
+    {
+      "key": "kimi-code-plan-cn",
+      "name": "Kimi For Coding (kimi.com)",
+      "name_zh": "Kimi For Coding（中国）",
+      "base_url_template": "https://api.kimi.com/coding/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan",
+      "note": "providers.presetNotes.kimiCoding"
+    },
+    {
+      "key": "kuae-cloud-coding-plan",
+      "name": "KUAE Cloud Coding Plan",
+      "name_zh": "KUAE 云编程套餐",
+      "base_url_template": "https://coding-plan-endpoint.kuaecloud.net/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.mthreads.com/kuaecloud/kuaecloud-doc-online/coding_plan/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan"
+    },
+    {
+      "key": "longcat",
+      "name": "LongCat",
+      "name_zh": "LongCat（美团）",
+      "base_url_template": "https://api.longcat.chat/openai",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://longcat.chat/platform/docs/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "minimax-cn",
+      "name": "MiniMax (minimax.cn)",
+      "name_zh": "MiniMax（中国）",
+      "base_url_template": "https://api.minimax.cn/anthropic/v1",
+      "base_url_variables": [],
+      "auth_scheme": "x-api-key",
+      "featured": true,
+      "doc": "https://platform.minimaxi.com/docs/guides/quickstart",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "api",
+      "note": "providers.presetNotes.minimaxAnthropic"
+    },
+    {
+      "key": "minimax",
+      "name": "MiniMax (minimax.io)",
+      "name_zh": "MiniMax（国际）",
+      "base_url_template": "https://api.minimax.io/anthropic/v1",
+      "base_url_variables": [],
+      "auth_scheme": "x-api-key",
+      "featured": true,
+      "doc": "https://platform.minimax.io/docs/guides/quickstart",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "api",
+      "note": "providers.presetNotes.minimaxAnthropic"
+    },
+    {
+      "key": "minimax-cn-coding-plan",
+      "name": "MiniMax Token Plan (minimax.cn)",
+      "name_zh": "MiniMax Token 套餐（中国）",
+      "base_url_template": "https://api.minimax.cn/anthropic/v1",
+      "base_url_variables": [],
+      "auth_scheme": "x-api-key",
+      "featured": true,
+      "doc": "https://platform.minimaxi.com/docs/token-plan/intro",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "token_plan",
+      "note": "providers.presetNotes.minimaxAnthropic"
+    },
+    {
+      "key": "minimax-coding-plan",
+      "name": "MiniMax Token Plan (minimax.io)",
+      "name_zh": "MiniMax Token 套餐（国际）",
+      "base_url_template": "https://api.minimax.io/anthropic/v1",
+      "base_url_variables": [],
+      "auth_scheme": "x-api-key",
+      "featured": true,
+      "doc": "https://platform.minimax.io/docs/token-plan/intro",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "token_plan",
+      "note": "providers.presetNotes.minimaxAnthropic"
+    },
+    {
+      "key": "mistral",
+      "name": "Mistral",
+      "name_zh": "Mistral",
+      "base_url_template": "https://api.mistral.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.mistral.ai/getting-started/models/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "modelscope",
+      "name": "ModelScope",
+      "name_zh": "魔搭 ModelScope",
+      "base_url_template": "https://api-inference.modelscope.cn/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://modelscope.cn/docs/model-service/API-Inference/intro",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "moonshotai",
+      "name": "Moonshot AI",
+      "name_zh": "月之暗面",
+      "base_url_template": "https://api.moonshot.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.moonshot.ai/docs/api/chat",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "moonshotai-cn",
+      "name": "Moonshot AI (China)",
+      "name_zh": "月之暗面（中国）",
+      "base_url_template": "https://api.moonshot.cn/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.moonshot.cn/docs/api/chat",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "nvidia",
+      "name": "Nvidia",
+      "name_zh": "NVIDIA",
+      "base_url_template": "https://integrate.api.nvidia.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.api.nvidia.com/nim/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "ollama",
+      "name": "Ollama",
+      "name_zh": "Ollama",
+      "base_url_template": "http://localhost:11434/v1",
+      "base_url_variables": [],
+      "auth_scheme": "none",
+      "featured": true,
+      "doc": "https://ollama.com",
+      "kind": "local",
+      "default_api_formats": [
+        "chat_completions"
+      ]
+    },
+    {
+      "key": "openai",
+      "name": "OpenAI",
+      "name_zh": "OpenAI",
+      "base_url_template": "https://api.openai.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.openai.com/docs/models",
+      "default_api_formats": [
+        "chat_completions",
+        "responses"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "openai-compatible",
+      "name": "OpenAI Compatible",
+      "name_zh": "OpenAI 兼容",
+      "base_url_template": "${BASE_URL}",
+      "base_url_variables": [
+        {
+          "name": "BASE_URL",
+          "label": "providers.vars.baseUrl",
+          "kind": "full-url",
+          "example": "https://proxy.example.com/v1",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": null,
+      "kind": "gateway",
+      "default_api_formats": [
+        "chat_completions"
+      ]
+    },
+    {
+      "key": "openrouter",
+      "name": "OpenRouter",
+      "name_zh": "OpenRouter",
+      "base_url_template": "https://openrouter.ai/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://openrouter.ai/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "perplexity",
+      "name": "Perplexity",
+      "name_zh": "Perplexity",
+      "base_url_template": "https://api.perplexity.ai",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.perplexity.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "scnet-token-plan",
+      "name": "SCNet Token Plan",
+      "name_zh": "SCNet Token 套餐",
+      "base_url_template": "https://api.scnet.cn/api/llm/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.scnet.cn/ac/openapi/doc/2.0/moduleapi/plans/token-plan.html",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "token_plan"
+    },
+    {
+      "key": "sensenova",
+      "name": "SenseNova (China)",
+      "name_zh": "商汤日日新",
+      "base_url_template": "https://token.sensenova.cn/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.sensenova.cn/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "siliconflow",
+      "name": "SiliconFlow",
+      "name_zh": "硅基流动",
+      "base_url_template": "https://api.siliconflow.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://cloud.siliconflow.com/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "siliconflow-cn",
+      "name": "SiliconFlow (China)",
+      "name_zh": "硅基流动（中国）",
+      "base_url_template": "https://api.siliconflow.cn/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://cloud.siliconflow.com/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "stepfun",
+      "name": "StepFun (China)",
+      "name_zh": "阶跃星辰（中国）",
+      "base_url_template": "https://api.stepfun.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.stepfun.com/docs/zh/overview/concept",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "stepfun-ai",
+      "name": "StepFun (Global)",
+      "name_zh": "阶跃星辰（国际）",
+      "base_url_template": "https://api.stepfun.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.stepfun.ai/docs/en/overview/concept",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "stepfun-step-plan",
+      "name": "StepFun Step Plan (China)",
+      "name_zh": "阶跃星辰 Step 套餐（中国）",
+      "base_url_template": "https://api.stepfun.com/step_plan/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.stepfun.com/docs/zh/step-plan/integrations/reasoning-api",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan"
+    },
+    {
+      "key": "stepfun-ai-step-plan",
+      "name": "StepFun Step Plan (Global)",
+      "name_zh": "阶跃星辰 Step 套餐（国际）",
+      "base_url_template": "https://api.stepfun.ai/step_plan/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.stepfun.ai/docs/en/step-plan/integrations/reasoning-api",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan"
+    },
+    {
+      "key": "tencent-coding-plan",
+      "name": "Tencent Coding Plan (China)",
+      "name_zh": "腾讯编程套餐（中国）",
+      "base_url_template": "https://api.lkeap.cloud.tencent.com/coding/v3",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://cloud.tencent.com/document/product/1772/128947",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan"
+    },
+    {
+      "key": "hunyuan",
+      "name": "Tencent Hunyuan",
+      "name_zh": "腾讯混元",
+      "base_url_template": "https://api.hunyuan.cloud.tencent.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://cloud.tencent.com/document/product/1729/111007",
+      "kind": "api",
+      "default_api_formats": [
+        "chat_completions"
+      ]
+    },
+    {
+      "key": "tencent-token-plan",
+      "name": "Tencent Token Plan",
+      "name_zh": "腾讯 Token 套餐",
+      "base_url_template": "https://api.lkeap.cloud.tencent.com/plan/v3",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://cloud.tencent.com/document/product/1823/130060",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "token_plan"
+    },
+    {
+      "key": "tencent-tokenhub",
+      "name": "Tencent TokenHub",
+      "name_zh": "腾讯 TokenHub",
+      "base_url_template": "https://tokenhub.tencentmaas.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://cloud.tencent.com/document/product/1823/130050",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "togetherai",
+      "name": "Together AI",
+      "name_zh": "Together AI",
+      "base_url_template": "https://api.together.xyz/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.together.ai/docs/serverless-models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "umans-ai-coding-plan",
+      "name": "Umans AI Coding Plan",
+      "name_zh": "Umans AI 编程套餐",
+      "base_url_template": "https://api.code.umans.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://app.umans.ai/offers/code/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan"
+    },
+    {
+      "key": "vercel",
+      "name": "Vercel AI Gateway",
+      "name_zh": "Vercel AI 网关",
+      "base_url_template": "https://ai-gateway.vercel.sh/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://github.com/vercel/ai/tree/5eb85cc45a259553501f535b8ac79a77d0e79223/packages/gateway",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "volcengine",
+      "name": "Volcengine Ark",
+      "name_zh": "火山引擎方舟",
+      "base_url_template": "https://ark.cn-beijing.volces.com/api/v3",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.volcengine.com/docs/82379/1330310",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "volcengine-coding-plan",
+      "name": "Volcengine Ark Coding Plan",
+      "name_zh": "火山引擎方舟编程套餐",
+      "base_url_template": "https://ark.cn-beijing.volces.com/api/coding/v3",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://www.volcengine.com/docs/82379/1928261",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan"
+    },
+    {
+      "key": "xai",
+      "name": "xAI",
+      "name_zh": "xAI",
+      "base_url_template": "https://api.x.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.x.ai/docs/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "xiaomi",
+      "name": "Xiaomi",
+      "name_zh": "小米",
+      "base_url_template": "https://api.xiaomimimo.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.xiaomimimo.com/#/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "xiaomi-token-plan-cn",
+      "name": "Xiaomi Token Plan (China)",
+      "name_zh": "小米 Token 套餐（中国）",
+      "base_url_template": "https://token-plan-cn.xiaomimimo.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.xiaomimimo.com/#/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "token_plan"
+    },
+    {
+      "key": "xiaomi-token-plan-ams",
+      "name": "Xiaomi Token Plan (Europe)",
+      "name_zh": "小米 Token 套餐（欧洲）",
+      "base_url_template": "https://token-plan-ams.xiaomimimo.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.xiaomimimo.com/#/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "token_plan"
+    },
+    {
+      "key": "xiaomi-token-plan-sgp",
+      "name": "Xiaomi Token Plan (Singapore)",
+      "name_zh": "小米 Token 套餐（新加坡）",
+      "base_url_template": "https://token-plan-sgp.xiaomimimo.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://platform.xiaomimimo.com/#/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "token_plan"
+    },
+    {
+      "key": "zai",
+      "name": "Z.AI",
+      "name_zh": "Z.AI",
+      "base_url_template": "https://api.z.ai/api/paas/v4",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.z.ai/guides/overview/pricing",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "zai-coding-plan",
+      "name": "Z.AI Coding Plan",
+      "name_zh": "Z.AI 编程套餐",
+      "base_url_template": "https://api.z.ai/api/coding/paas/v4",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.z.ai/devpack/overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan"
+    },
+    {
+      "key": "zhipuai",
+      "name": "Zhipu AI",
+      "name_zh": "智谱 AI",
+      "base_url_template": "https://open.bigmodel.cn/api/paas/v4",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.bigmodel.cn/cn/guide/start/pricing",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "zhipuai-coding-plan",
+      "name": "Zhipu AI Coding Plan",
+      "name_zh": "智谱 AI 编程套餐",
+      "base_url_template": "https://open.bigmodel.cn/api/coding/paas/v4",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": true,
+      "doc": "https://docs.bigmodel.cn/cn/coding-plan/overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "coding_plan"
+    },
+    {
+      "key": "302ai",
+      "name": "302.AI",
+      "name_zh": "302.AI",
+      "base_url_template": "https://api.302.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://doc.302.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "abacus",
+      "name": "Abacus",
+      "name_zh": "Abacus",
+      "base_url_template": "https://routellm.abacus.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://abacus.ai/help/api",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "abliteration-ai",
+      "name": "abliteration.ai",
+      "name_zh": "abliteration.ai",
+      "base_url_template": "https://api.abliteration.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.abliteration.ai/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "above",
+      "name": "above.dev",
+      "name_zh": "above.dev",
+      "base_url_template": "https://api.above.dev/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://above.dev/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "agentrouter",
+      "name": "AgentRouter",
+      "name_zh": "AgentRouter",
+      "base_url_template": "https://agentrouter.org/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://agentrouter.org/docs/opencode.html",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "agnes",
+      "name": "Agnes AI",
+      "name_zh": "Agnes AI",
+      "base_url_template": "https://apihub.agnes-ai.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://agnes-ai.com/doc",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "ai-router",
+      "name": "AI-ROUTER",
+      "name_zh": "AI-ROUTER",
+      "base_url_template": "https://api.ai-router.dev/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://ai-router.dev/openai-compatible-api-gateway/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "aimlapi",
+      "name": "AI/ML API",
+      "name_zh": "AI/ML API",
+      "base_url_template": "https://api.aimlapi.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.aimlapi.com",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "aiand",
+      "name": "ai&",
+      "name_zh": "ai&",
+      "base_url_template": "https://api.aiand.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.aiand.com/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "ai21",
+      "name": "AI21 Labs",
+      "name_zh": "AI21 Labs",
+      "base_url_template": "https://api.ai21.com/studio/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.ai21.com/docs/jamba-foundation-models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "aihubmix",
+      "name": "AIHubMix",
+      "name_zh": "AIHubMix",
+      "base_url_template": "${BASE_URL}",
+      "base_url_variables": [
+        {
+          "name": "BASE_URL",
+          "label": "providers.vars.baseUrl",
+          "kind": "full-url",
+          "example": "https://proxy.example.com/v1",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.aihubmix.com",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "ainetcafe",
+      "name": "ainetcafe",
+      "name_zh": "ainetcafe",
+      "base_url_template": "https://microquickjs.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://ainetcafe.com/k3/guides/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "aixy",
+      "name": "Aixy",
+      "name_zh": "Aixy",
+      "base_url_template": "https://api.aixy-gateway.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.aixy-gateway.com/integrations/overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "aki-io",
+      "name": "AKI.IO",
+      "name_zh": "AKI.IO",
+      "base_url_template": "https://aki.io/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://aki.io/docs/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "ambient",
+      "name": "Ambient",
+      "name_zh": "Ambient",
+      "base_url_template": "https://api.ambient.xyz/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://ambient.xyz",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "amd",
+      "name": "AMD",
+      "name_zh": "AMD",
+      "base_url_template": "https://developer.amd.com.cn/radeon/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://developer.amd.com.cn/radeon/tokenfactory",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "anyapi",
+      "name": "AnyAPI",
+      "name_zh": "AnyAPI",
+      "base_url_template": "https://api.anyapi.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.anyapi.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "arcee",
+      "name": "Arcee",
+      "name_zh": "Arcee",
+      "base_url_template": "https://api.arcee.ai/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.arcee.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "atomic-chat",
+      "name": "Atomic Chat",
+      "name_zh": "Atomic Chat",
+      "base_url_template": "http://127.0.0.1:1337/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://atomic.chat",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "local"
+    },
+    {
+      "key": "auriko",
+      "name": "Auriko",
+      "name_zh": "Auriko",
+      "base_url_template": "https://api.auriko.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.auriko.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "azure-cognitive-services",
+      "name": "Azure Cognitive Services",
+      "name_zh": "Azure Cognitive Services",
+      "base_url_template": "${BASE_URL}",
+      "base_url_variables": [
+        {
+          "name": "BASE_URL",
+          "label": "providers.vars.baseUrl",
+          "kind": "full-url",
+          "example": "https://proxy.example.com/v1",
+          "required": true
+        }
+      ],
+      "auth_scheme": "api-key",
+      "featured": false,
+      "doc": "https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "baseten",
+      "name": "Baseten",
+      "name_zh": "Baseten",
+      "base_url_template": "https://inference.baseten.co/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.baseten.co/inference/model-apis/overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "bee",
+      "name": "Bee by HEOSSI",
+      "name_zh": "Bee by HEOSSI",
+      "base_url_template": "https://api.bee.heossi.com/bee",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://bee.heossi.com/docs/sdks",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "berget",
+      "name": "Berget.AI",
+      "name_zh": "Berget.AI",
+      "base_url_template": "https://api.berget.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://api.berget.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "blueclaw",
+      "name": "Blue Claw",
+      "name_zh": "Blue Claw",
+      "base_url_template": "https://openai.blueclaw.network/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://blueclaw.network",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "bothub",
+      "name": "Bothub",
+      "name_zh": "Bothub",
+      "base_url_template": "https://openai.bothub.ru/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://bothub.ru/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "boundless",
+      "name": "Boundless",
+      "name_zh": "Boundless",
+      "base_url_template": "https://api.inference.boundless.network/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://inference.boundless.network/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "hyper",
+      "name": "Charm Hyper",
+      "name_zh": "Charm Hyper",
+      "base_url_template": "https://hyper.charm.land/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://hyper.charm.land",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "chutes",
+      "name": "Chutes",
+      "name_zh": "Chutes",
+      "base_url_template": "https://llm.chutes.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://llm.chutes.ai/v1/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "clarifai",
+      "name": "Clarifai",
+      "name_zh": "Clarifai",
+      "base_url_template": "https://api.clarifai.com/v2/ext/openai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.clarifai.com/compute/inference/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "claudinio",
+      "name": "Claudinio",
+      "name_zh": "Claudinio",
+      "base_url_template": "https://api.claudin.io/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://claudin.io",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "cline-pass",
+      "name": "ClinePass",
+      "name_zh": "ClinePass",
+      "base_url_template": "https://api.cline.bot/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.cline.bot/getting-started/clinepass",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "subscription",
+      "note": "providers.presetNotes.opencode"
+    },
+    {
+      "key": "cloudferro-sherlock",
+      "name": "CloudFerro Sherlock",
+      "name_zh": "CloudFerro Sherlock",
+      "base_url_template": "https://api-sherlock.cloudferro.com/openai/v1/",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.sherlock.cloudferro.com/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "cloudflare-ai-gateway",
+      "name": "Cloudflare AI Gateway",
+      "name_zh": "Cloudflare AI Gateway",
+      "base_url_template": "${BASE_URL}",
+      "base_url_variables": [
+        {
+          "name": "BASE_URL",
+          "label": "providers.vars.baseUrl",
+          "kind": "full-url",
+          "example": "https://proxy.example.com/v1",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://developers.cloudflare.com/ai-gateway/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "cloudflare-workers-ai",
+      "name": "Cloudflare Workers AI",
+      "name_zh": "Cloudflare Workers AI",
+      "base_url_template": "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+      "base_url_variables": [
+        {
+          "name": "CLOUDFLARE_ACCOUNT_ID",
+          "label": "providers.vars.accountId",
+          "kind": "path-segment",
+          "example": "0123456789abcdef",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://developers.cloudflare.com/workers-ai/models/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "commandcode",
+      "name": "CommandCode",
+      "name_zh": "CommandCode",
+      "base_url_template": "https://api.commandcode.ai/provider/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://commandcode.ai/docs/provider",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "coralbricks",
+      "name": "CoralBricks",
+      "name_zh": "CoralBricks",
+      "base_url_template": "https://inference.coralbricks.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.coralbricks.ai/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "wandb",
+      "name": "CoreWeave",
+      "name_zh": "CoreWeave",
+      "base_url_template": "https://api.inference.wandb.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.wandb.ai/inference",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "cortecs",
+      "name": "Cortecs",
+      "name_zh": "Cortecs",
+      "base_url_template": "https://api.cortecs.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://api.cortecs.ai/v1/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "crossmodel",
+      "name": "CrossModel",
+      "name_zh": "CrossModel",
+      "base_url_template": "https://api.crossmodel.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.crossmodel.ai/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "crusoe",
+      "name": "Crusoe",
+      "name_zh": "Crusoe",
+      "base_url_template": "https://api.inference.crusoecloud.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.crusoecloud.com/managed-inference/overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "drun",
+      "name": "D.Run (China)",
+      "name_zh": "D.Run（中国）",
+      "base_url_template": "https://chat.d.run/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.d.run",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "daoxe",
+      "name": "DaoXE",
+      "name_zh": "DaoXE",
+      "base_url_template": "https://daoxe.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://daoxe.com/pricing",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "databricks",
+      "name": "Databricks",
+      "name_zh": "Databricks",
+      "base_url_template": "https://${DATABRICKS_HOST}/ai-gateway/mlflow/v1",
+      "base_url_variables": [
+        {
+          "name": "DATABRICKS_HOST",
+          "label": "providers.vars.workspaceHost",
+          "kind": "host-only",
+          "example": "dbc-1234abcd-5678.cloud.databricks.com",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.databricks.com/aws/en/machine-learning/foundation-models/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "llmgateway",
+      "name": "DevPass (LLM Gateway)",
+      "name_zh": "DevPass（LLM Gateway）",
+      "base_url_template": "https://api.llmgateway.io/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://llmgateway.io/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "subscription",
+      "note": "providers.presetNotes.opencode"
+    },
+    {
+      "key": "digitalocean",
+      "name": "DigitalOcean",
+      "name_zh": "DigitalOcean",
+      "base_url_template": "https://inference.do-ai.run/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.digitalocean.com/products/gradient-ai-platform/details/models/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "dinference",
+      "name": "DInference",
+      "name_zh": "DInference",
+      "base_url_template": "https://api.dinference.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://dinference.com",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "ebcloud",
+      "name": "EBCloud",
+      "name_zh": "EBCloud",
+      "base_url_template": "https://maas-api.ebcloud.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.ebtech.com/ai/model-api.html",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "echo",
+      "name": "Echo",
+      "name_zh": "Echo",
+      "base_url_template": "https://echo.tracerml.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://echo.tracerml.ai/docs/api",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "edenai",
+      "name": "Eden AI",
+      "name_zh": "Eden AI",
+      "base_url_template": "https://api.edenai.run/v3",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.edenai.co",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "empiriolabs",
+      "name": "EmpirioLabs AI",
+      "name_zh": "EmpirioLabs AI",
+      "base_url_template": "https://api.empiriolabs.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.empiriolabs.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "engy",
+      "name": "engy",
+      "name_zh": "engy",
+      "base_url_template": "https://api.engy.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://engy.ai/pricing",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "evroc",
+      "name": "evroc",
+      "name_zh": "evroc",
+      "base_url_template": "https://models.think.evroc.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.evroc.com/products/think/overview.html",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "fastrouter",
+      "name": "FastRouter",
+      "name_zh": "FastRouter",
+      "base_url_template": "https://go.fastrouter.ai/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://fastrouter.ai/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "freemodel",
+      "name": "FreeModel",
+      "name_zh": "FreeModel",
+      "base_url_template": "https://cc.freemodel.dev/v1",
+      "base_url_variables": [],
+      "auth_scheme": "x-api-key",
+      "featured": false,
+      "doc": "https://freemodel.dev",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "api",
+      "note": "providers.presetNotes.anthropicCompatible"
+    },
+    {
+      "key": "friendli",
+      "name": "Friendli",
+      "name_zh": "Friendli",
+      "base_url_template": "https://api.friendli.ai/serverless/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://friendli.ai/docs/guides/serverless_endpoints/introduction",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "frogbot",
+      "name": "FrogBot",
+      "name_zh": "FrogBot",
+      "base_url_template": "https://app.frogbot.ai/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.frogbot.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "github-copilot",
+      "name": "GitHub Copilot",
+      "name_zh": "GitHub Copilot",
+      "base_url_template": "https://api.githubcopilot.com",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.github.com/en/copilot",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "subscription",
+      "note": "providers.presetNotes.githubCopilot"
+    },
+    {
+      "key": "gmicloud",
+      "name": "GMI Cloud",
+      "name_zh": "GMI Cloud",
+      "base_url_template": "https://api.gmi-serving.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.gmicloud.ai/inference-engine/api-reference/llm-api-reference",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "greenpt",
+      "name": "GreenPT",
+      "name_zh": "GreenPT",
+      "base_url_template": "https://api.greenpt.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.greenpt.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "helicone",
+      "name": "Helicone",
+      "name_zh": "Helicone",
+      "base_url_template": "https://ai-gateway.helicone.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://helicone.ai/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "hetzner",
+      "name": "Hetzner",
+      "name_zh": "Hetzner",
+      "base_url_template": "https://inference.hetzner.com/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://experiments.hetzner.com/docs/inference",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "hpc-ai",
+      "name": "HPC-AI",
+      "name_zh": "HPC-AI",
+      "base_url_template": "https://api.hpc-ai.com/inference/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.hpc-ai.com/doc/docs/quickstart/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "huggingface",
+      "name": "Hugging Face",
+      "name_zh": "Hugging Face",
+      "base_url_template": "https://router.huggingface.co/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://huggingface.co/docs/inference-providers",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "impossibl",
+      "name": "Impossibl",
+      "name_zh": "Impossibl",
+      "base_url_template": "https://api.impossibl.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://impossibl.com/docs/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "inception",
+      "name": "Inception",
+      "name_zh": "Inception",
+      "base_url_template": "https://api.inceptionlabs.ai/v1/",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.inceptionlabs.ai/get-started/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "inceptron",
+      "name": "Inceptron",
+      "name_zh": "Inceptron",
+      "base_url_template": "https://api.inceptron.io/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.inceptron.io",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "inco",
+      "name": "Inco",
+      "name_zh": "Inco",
+      "base_url_template": "https://api.inco.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://platform.inco.ai/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "infer",
+      "name": "Infer by Flow7",
+      "name_zh": "Infer by Flow7",
+      "base_url_template": "https://infer.flow7.org/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://infer.flow7.org/opencode",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "inference",
+      "name": "Inference",
+      "name_zh": "Inference",
+      "base_url_template": "https://inference.net/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://inference.net/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "inferx",
+      "name": "InferX",
+      "name_zh": "InferX",
+      "base_url_template": "https://model.inferx.net/endpoints/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://model.inferx.net/endpoints",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "infomaniak",
+      "name": "Infomaniak",
+      "name_zh": "Infomaniak",
+      "base_url_template": "https://api.infomaniak.com/2/ai/${INFOMANIAK_PRODUCT_ID}/openai/v1",
+      "base_url_variables": [
+        {
+          "name": "INFOMANIAK_PRODUCT_ID",
+          "label": "providers.vars.productId",
+          "kind": "path-segment",
+          "example": "12345",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.infomaniak.com/en/hosting/ai-services/open-source-models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "io-net",
+      "name": "IO.NET",
+      "name_zh": "IO.NET",
+      "base_url_template": "https://api.intelligence.io.solutions/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://io.net/docs/guides/intelligence/io-intelligence",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "iteracompute",
+      "name": "IteraCompute",
+      "name_zh": "IteraCompute",
+      "base_url_template": "https://api.iteracompute.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://iteracompute.com/docs.html",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "jalapeno",
+      "name": "Jalapeno Cloud",
+      "name_zh": "Jalapeno Cloud",
+      "base_url_template": "https://api.jalapeno-cloud.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.jalapeno-cloud.ai/docs/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "jiekou",
+      "name": "Jiekou.AI",
+      "name_zh": "Jiekou.AI",
+      "base_url_template": "https://api.jiekou.ai/openai",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.jiekou.ai/docs/support/quickstart?utm_source=github_models.dev",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "kenari",
+      "name": "Kenari",
+      "name_zh": "Kenari",
+      "base_url_template": "https://kenari.id/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://kenari.id/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "kilo",
+      "name": "Kilo Gateway",
+      "name_zh": "Kilo Gateway",
+      "base_url_template": "https://api.kilo.ai/api/gateway",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://kilo.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "klokintegration",
+      "name": "klokintegration.se",
+      "name_zh": "klokintegration.se",
+      "base_url_template": "https://api-gw.klok.ipaas.se/proxy/kloker-key/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://klokintegration.se/docs/ai-api",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "kosmik",
+      "name": "Kosmik Compute",
+      "name_zh": "Kosmik Compute",
+      "base_url_template": "https://api.koscompute.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://api.koscompute.com/docs/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "lilac",
+      "name": "Lilac",
+      "name_zh": "Lilac",
+      "base_url_template": "https://api.getlilac.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.getlilac.com/inference/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "liquid",
+      "name": "Liquid Inference",
+      "name_zh": "Liquid Inference",
+      "base_url_template": "https://router.inference.ai.exchange/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://inference.ai.exchange/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "llmgateway-providers",
+      "name": "LLM Gateway",
+      "name_zh": "LLM Gateway",
+      "base_url_template": "https://api.llmgateway.io/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://llmgateway.io/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "subscription",
+      "note": "providers.presetNotes.opencode"
+    },
+    {
+      "key": "llmtech",
+      "name": "LLM Tech",
+      "name_zh": "LLM Tech",
+      "base_url_template": "https://api.llmtech.eu/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://llmtech.eu/models/qwen3.8-27b",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "llmtr",
+      "name": "LLMTR",
+      "name_zh": "LLMTR",
+      "base_url_template": "https://llmtr.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://llmtr.com/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "lmstudio",
+      "name": "LMStudio",
+      "name_zh": "LMStudio",
+      "base_url_template": "http://127.0.0.1:1234/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://lmstudio.ai/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "local"
+    },
+    {
+      "key": "lowrouter",
+      "name": "LowRouter",
+      "name_zh": "LowRouter",
+      "base_url_template": "https://api.lowrouter.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://lowrouter.ai/docs/models/available",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "lucidquery",
+      "name": "LucidQuery",
+      "name_zh": "LucidQuery",
+      "base_url_template": "https://api.lucidquery.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://lucidquery.com/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "lynkr",
+      "name": "Lynkr",
+      "name_zh": "Lynkr",
+      "base_url_template": "http://127.0.0.1:8081/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://github.com/Fast-Editor/Lynkr",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "local"
+    },
+    {
+      "key": "meganova",
+      "name": "Meganova",
+      "name_zh": "Meganova",
+      "base_url_template": "https://api.meganova.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.meganova.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "melious",
+      "name": "Melious",
+      "name_zh": "Melious",
+      "base_url_template": "https://api.melious.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://melious.ai/docs/reference/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "merge-gateway",
+      "name": "Merge Gateway",
+      "name_zh": "Merge Gateway",
+      "base_url_template": "https://api-gateway.merge.dev/v1/ai-sdk",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.merge.dev/merge-gateway",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "meta",
+      "name": "Meta",
+      "name_zh": "Meta",
+      "base_url_template": "https://api.meta.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://dev.meta.ai/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "mixlayer",
+      "name": "Mixlayer",
+      "name_zh": "Mixlayer",
+      "base_url_template": "https://models.mixlayer.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.mixlayer.com",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "moark",
+      "name": "Moark",
+      "name_zh": "Moark",
+      "base_url_template": "https://moark.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://moark.com/docs/openapi/v1#tag/%E6%96%87%E6%9C%AC%E7%94%9F%E6%88%90",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "modal",
+      "name": "Modal",
+      "name_zh": "Modal",
+      "base_url_template": "https://inference.us-west.modal.direct/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://modal.com/docs/guide/endpoints",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "model-oracle-ai",
+      "name": "Model Oracle AI",
+      "name_zh": "Model Oracle AI",
+      "base_url_template": "https://api.modeloracle.com/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://modeloracle.com/setup/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "modelis",
+      "name": "Modelis",
+      "name_zh": "Modelis",
+      "base_url_template": "https://modelishub.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://modelishub.com/pricing",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "morph",
+      "name": "Morph",
+      "name_zh": "Morph",
+      "base_url_template": "https://api.morphllm.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.morphllm.com/api-reference/introduction",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "nan",
+      "name": "NaN",
+      "name_zh": "NaN",
+      "base_url_template": "https://api.nan.builders/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://nan.builders/docs/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "nano-gpt",
+      "name": "NanoGPT",
+      "name_zh": "NanoGPT",
+      "base_url_template": "https://nano-gpt.com/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.nano-gpt.com",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "nearai",
+      "name": "NEAR AI Cloud",
+      "name_zh": "NEAR AI Cloud",
+      "base_url_template": "https://cloud-api.near.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.near.ai/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "nebius",
+      "name": "Nebius Token Factory",
+      "name_zh": "Nebius Token Factory",
+      "base_url_template": "https://api.tokenfactory.nebius.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.tokenfactory.nebius.com/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "neon",
+      "name": "Neon",
+      "name_zh": "Neon",
+      "base_url_template": "${NEON_AI_GATEWAY_BASE_URL}/v1",
+      "base_url_variables": [
+        {
+          "name": "NEON_AI_GATEWAY_BASE_URL",
+          "label": "providers.vars.gatewayBaseUrl",
+          "kind": "full-url",
+          "example": "https://ep-cool-123456.us-east-2.aws.neon.tech",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://neon.com/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "neosmith",
+      "name": "NeoSmith",
+      "name_zh": "NeoSmith",
+      "base_url_template": "https://router.neosmith.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://neosmith.ai/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "neuralwatt",
+      "name": "Neuralwatt",
+      "name_zh": "Neuralwatt",
+      "base_url_template": "https://api.neuralwatt.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://portal.neuralwatt.com/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "nova",
+      "name": "Nova",
+      "name_zh": "Nova",
+      "base_url_template": "https://api.nova.amazon.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://nova.amazon.com/dev/documentation",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "novita-ai",
+      "name": "Novita AI",
+      "name_zh": "Novita AI",
+      "base_url_template": "https://api.novita.ai/openai",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://novita.ai/docs/guides/introduction",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "oci",
+      "name": "OCI Generative AI",
+      "name_zh": "OCI Generative AI",
+      "base_url_template": "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/openai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.oracle.com/en-us/iaas/Content/generative-ai/pretrained-models.htm",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "ofox",
+      "name": "Ofox",
+      "name_zh": "Ofox",
+      "base_url_template": "https://api.ofox.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://ofox.ai/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "ollama-cloud",
+      "name": "Ollama Cloud",
+      "name_zh": "Ollama Cloud",
+      "base_url_template": "https://ollama.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.ollama.com/cloud",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "opencode",
+      "name": "OpenCode",
+      "name_zh": "OpenCode",
+      "base_url_template": "https://opencode.ai/inference/openai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://opencode.ai/v2/docs/console/models/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "subscription",
+      "note": "providers.presetNotes.opencode"
+    },
+    {
+      "key": "opencode-go",
+      "name": "OpenCode Go",
+      "name_zh": "OpenCode Go",
+      "base_url_template": "https://opencode.ai/inference/go/openai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://opencode.ai/v2/docs/console/go/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "subscription",
+      "note": "providers.presetNotes.opencode"
+    },
+    {
+      "key": "openreason",
+      "name": "OpenReason",
+      "name_zh": "OpenReason",
+      "base_url_template": "https://api.openreason.app/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://openreason.app/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "opper",
+      "name": "Opper",
+      "name_zh": "Opper",
+      "base_url_template": "https://api.opper.ai/v3/compat",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://opper.ai/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "orcarouter",
+      "name": "OrcaRouter",
+      "name_zh": "OrcaRouter",
+      "base_url_template": "https://api.orcarouter.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.orcarouter.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "ovhcloud",
+      "name": "OVHcloud AI Endpoints",
+      "name_zh": "OVHcloud AI Endpoints",
+      "base_url_template": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.ovhcloud.com/en/public-cloud/ai-endpoints/catalog//",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "pareto",
+      "name": "Pareto Inference",
+      "name_zh": "Pareto Inference",
+      "base_url_template": "https://api.paretoinference.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.paretoinference.com/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "pendra",
+      "name": "Pendra",
+      "name_zh": "Pendra",
+      "base_url_template": "https://api.pendra.ai/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://pendra.ai/docs/integrations/opencode",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "perplexity-agent",
+      "name": "Perplexity Agent",
+      "name_zh": "Perplexity Agent",
+      "base_url_template": "https://api.perplexity.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.perplexity.ai/docs/agent-api/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "pioneer",
+      "name": "Pioneer",
+      "name_zh": "Pioneer",
+      "base_url_template": "https://api.fastino.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://agent.pioneer.ai/llms.txt",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "poe",
+      "name": "Poe",
+      "name_zh": "Poe",
+      "base_url_template": "https://api.poe.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://creator.poe.com/docs/external-applications/openai-compatible-api",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "subscription",
+      "note": "providers.presetNotes.poe"
+    },
+    {
+      "key": "poolside",
+      "name": "Poolside",
+      "name_zh": "Poolside",
+      "base_url_template": "https://inference.poolside.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://platform.poolside.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "prime",
+      "name": "Prime Inference",
+      "name_zh": "Prime Inference",
+      "base_url_template": "https://api.pinference.ai/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.primeintellect.ai/inference/overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "privatemode-ai",
+      "name": "Privatemode AI",
+      "name_zh": "Privatemode AI",
+      "base_url_template": "http://localhost:8080/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.privatemode.ai/api/overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "local"
+    },
+    {
+      "key": "qihang-ai",
+      "name": "QiHang",
+      "name_zh": "QiHang",
+      "base_url_template": "https://api.qhaigc.net/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.qhaigc.net/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "qiniu-ai",
+      "name": "Qiniu",
+      "name_zh": "Qiniu",
+      "base_url_template": "https://api.qnaigc.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://developer.qiniu.com/aitokenapi",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "qvac",
+      "name": "QVAC",
+      "name_zh": "QVAC",
+      "base_url_template": "${BASE_URL}",
+      "base_url_variables": [
+        {
+          "name": "BASE_URL",
+          "label": "providers.vars.baseUrl",
+          "kind": "full-url",
+          "example": "https://proxy.example.com/v1",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.npmjs.com/package/@qvac/ai-sdk-provider",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "reflection",
+      "name": "Reflection",
+      "name_zh": "Reflection",
+      "base_url_template": "https://api.reflection.ai/openai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://developers.reflection.ai/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "regolo-ai",
+      "name": "Regolo AI",
+      "name_zh": "Regolo AI",
+      "base_url_template": "https://api.regolo.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.regolo.ai/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "requesty",
+      "name": "Requesty",
+      "name_zh": "Requesty",
+      "base_url_template": "https://router.requesty.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://requesty.ai/solution/llm-routing/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "routing-run",
+      "name": "routing.run",
+      "name_zh": "routing.run",
+      "base_url_template": "https://api.routing.run/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.routing.run/api-reference/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "runinfra",
+      "name": "RunInfra",
+      "name_zh": "RunInfra",
+      "base_url_template": "https://api.runinfra.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://runinfra.ai/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "sakana",
+      "name": "Sakana AI",
+      "name_zh": "Sakana AI",
+      "base_url_template": "https://api.sakana.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://console.sakana.ai/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "salad-cloud",
+      "name": "SaladCloud AI Gateway",
+      "name_zh": "SaladCloud AI Gateway",
+      "base_url_template": "${BASE_URL}",
+      "base_url_variables": [
+        {
+          "name": "BASE_URL",
+          "label": "providers.vars.baseUrl",
+          "kind": "full-url",
+          "example": "https://proxy.example.com/v1",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.salad.com/ai-gateway/explanation/overview",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "sambanova",
+      "name": "SambaNova",
+      "name_zh": "SambaNova",
+      "base_url_template": "https://api.sambanova.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.sambanova.ai/cloud/docs/get-started/supported-models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "sap-ai-core",
+      "name": "SAP AI Core",
+      "name_zh": "SAP AI Core",
+      "base_url_template": "${BASE_URL}",
+      "base_url_variables": [
+        {
+          "name": "BASE_URL",
+          "label": "providers.vars.baseUrl",
+          "kind": "full-url",
+          "example": "https://proxy.example.com/v1",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://help.sap.com/docs/sap-ai-core",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "sarvam",
+      "name": "Sarvam AI",
+      "name_zh": "Sarvam AI",
+      "base_url_template": "https://api.sarvam.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.sarvam.ai/api-reference-docs/getting-started/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "scaleway",
+      "name": "Scaleway",
+      "name_zh": "Scaleway",
+      "base_url_template": "https://api.scaleway.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.scaleway.com/en/docs/generative-apis/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "scx-ai",
+      "name": "SCX.ai",
+      "name_zh": "SCX.ai",
+      "base_url_template": "https://api.scx.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://platform.scx.ai/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "snowflake-cortex",
+      "name": "Snowflake Cortex",
+      "name_zh": "Snowflake Cortex",
+      "base_url_template": "https://${SNOWFLAKE_ACCOUNT}.snowflakecomputing.com/api/v2/cortex/v1",
+      "base_url_variables": [
+        {
+          "name": "SNOWFLAKE_ACCOUNT",
+          "label": "providers.vars.snowflakeAccount",
+          "kind": "host-label",
+          "example": "myorg-myaccount",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-rest-api",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "stackit",
+      "name": "STACKIT",
+      "name_zh": "STACKIT",
+      "base_url_template": "https://api.openai-compat.model-serving.eu01.onstackit.cloud/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.stackit.cloud/products/data-and-ai/ai-model-serving/basics/available-shared-models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "standardcompute",
+      "name": "Standard Compute",
+      "name_zh": "Standard Compute",
+      "base_url_template": "https://api.stdcmpt.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.standardcompute.com/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "subconscious",
+      "name": "Subconscious",
+      "name_zh": "Subconscious",
+      "base_url_template": "https://api.subconscious.dev/v1",
+      "base_url_variables": [],
+      "auth_scheme": "x-api-key",
+      "featured": false,
+      "doc": "https://docs.subconscious.dev",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "api",
+      "note": "providers.presetNotes.anthropicCompatible"
+    },
+    {
+      "key": "submodel",
+      "name": "submodel",
+      "name_zh": "submodel",
+      "base_url_template": "https://llm.submodel.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://submodel.gitbook.io",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "synthetic",
+      "name": "Synthetic",
+      "name_zh": "Synthetic",
+      "base_url_template": "https://api.synthetic.new/openai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://synthetic.new/pricing",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "subscription"
+    },
+    {
+      "key": "tempr",
+      "name": "Tempr Gateway",
+      "name_zh": "Tempr Gateway",
+      "base_url_template": "https://api.temprhq.io/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://temprhq.io/docs/gateway-reference.html",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "tensorx",
+      "name": "TensorX",
+      "name_zh": "TensorX",
+      "base_url_template": "https://api.tensorx.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.tensorx.ai/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "the-grid-ai",
+      "name": "The Grid AI",
+      "name_zh": "The Grid AI",
+      "base_url_template": "https://api.thegrid.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://thegrid.ai/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "thinkingmachines",
+      "name": "Thinking Machines",
+      "name_zh": "Thinking Machines",
+      "base_url_template": "https://tinker.thinkingmachines.dev/services/tinker-prod/anthropic/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "x-api-key",
+      "featured": false,
+      "doc": "https://tinker-docs.thinkingmachines.ai/tinker/compatible-apis/anthropic/",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "api",
+      "note": "providers.presetNotes.anthropicCompatible"
+    },
+    {
+      "key": "tinfoil",
+      "name": "Tinfoil",
+      "name_zh": "Tinfoil",
+      "base_url_template": "https://inference.tinfoil.sh/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.tinfoil.sh",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "tokengo",
+      "name": "TokenGo",
+      "name_zh": "TokenGo",
+      "base_url_template": "https://api.tokengo.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.tokengo.com/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "tokenrouter",
+      "name": "TokenRouter",
+      "name_zh": "TokenRouter",
+      "base_url_template": "https://api.tokenrouter.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.tokenrouter.com/docs/tokenrouter-feature-guide/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "trustedrouter",
+      "name": "TrustedRouter",
+      "name_zh": "TrustedRouter",
+      "base_url_template": "https://api.trustedrouter.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://trustedrouter.com/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "umans-ai",
+      "name": "Umans AI",
+      "name_zh": "Umans AI",
+      "base_url_template": "https://api.code.umans.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://app.umans.ai/offers/code/docs/orgs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "unorouter",
+      "name": "UnoRouter",
+      "name_zh": "UnoRouter",
+      "base_url_template": "https://api.unorouter.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://unorouter.com/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "upstage",
+      "name": "Upstage",
+      "name_zh": "Upstage",
+      "base_url_template": "https://api.upstage.ai/v1/solar",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://developers.upstage.ai/docs/apis/chat",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "vancine",
+      "name": "Vancine",
+      "name_zh": "Vancine",
+      "base_url_template": "https://vancine.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://vancine.com/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "venice",
+      "name": "Venice AI",
+      "name_zh": "Venice AI",
+      "base_url_template": "${BASE_URL}",
+      "base_url_variables": [
+        {
+          "name": "BASE_URL",
+          "label": "providers.vars.baseUrl",
+          "kind": "full-url",
+          "example": "https://proxy.example.com/v1",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.venice.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "google-vertex-anthropic",
+      "name": "Vertex (Anthropic)",
+      "name_zh": "Vertex（Anthropic）",
+      "group": "Vertex AI",
+      "variant_label": "providers.variants.vertexAnthropic",
+      "base_url_template": "https://{location}-aiplatform.googleapis.com",
+      "base_url_variables": [
+        {
+          "name": "location",
+          "label": "providers.vars.location",
+          "kind": "gcp-location",
+          "example": "us-east5",
+          "required": true
+        }
+      ],
+      "auth_scheme": "google_service_account",
+      "featured": false,
+      "doc": "https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "enterprise",
+      "note": "providers.presetNotes.vertex",
+      "path_template": "/v1/projects/{project}/locations/{location}/publishers/anthropic/models/{model}:{action}",
+      "path_variables": [
+        {
+          "name": "project",
+          "label": "providers.params.project",
+          "kind": "gcp-project",
+          "example": "my-project",
+          "required": true
+        },
+        {
+          "name": "location",
+          "label": "providers.vars.location",
+          "kind": "gcp-location",
+          "example": "us-east5",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "google-vertex-global-anthropic",
+      "name": "Vertex (Global, Anthropic)",
+      "name_zh": "Vertex（全球，Anthropic）",
+      "group": "Vertex AI",
+      "variant_label": "providers.variants.vertexGlobalAnthropic",
+      "base_url_template": "https://aiplatform.googleapis.com",
+      "base_url_variables": [],
+      "auth_scheme": "google_service_account",
+      "featured": false,
+      "doc": "https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude",
+      "default_api_formats": [
+        "anthropic_messages"
+      ],
+      "kind": "enterprise",
+      "note": "providers.presetNotes.vertex",
+      "path_template": "/v1/projects/{project}/locations/global/publishers/anthropic/models/{model}:{action}",
+      "path_variables": [
+        {
+          "name": "project",
+          "label": "providers.params.project",
+          "kind": "gcp-project",
+          "example": "my-project",
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "vispark",
+      "name": "Vispark",
+      "name_zh": "Vispark",
+      "base_url_template": "https://api.lab.vispark.in/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://lab.vispark.in/#vision",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "vivgrid",
+      "name": "Vivgrid",
+      "name_zh": "Vivgrid",
+      "base_url_template": "https://api.vivgrid.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.vivgrid.com/models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "vultr",
+      "name": "Vultr",
+      "name_zh": "Vultr",
+      "base_url_template": "https://api.vultrinference.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://api.vultrinference.com/",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "wafer.ai",
+      "name": "Wafer",
+      "name_zh": "Wafer",
+      "base_url_template": "https://pass.wafer.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.wafer.ai/wafer-pass",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "wallaby",
+      "name": "Wallaby",
+      "name_zh": "Wallaby",
+      "base_url_template": "https://api.wallabytoken.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://wallabytoken.com/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "watsonx",
+      "name": "watsonx.ai",
+      "name_zh": "watsonx.ai",
+      "base_url_template": "${BASE_URL}",
+      "base_url_variables": [
+        {
+          "name": "BASE_URL",
+          "label": "providers.vars.baseUrl",
+          "kind": "full-url",
+          "example": "https://proxy.example.com/v1",
+          "required": true
+        }
+      ],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.ibm.com/docs/en/watsonx/saas?topic=solutions-supported-foundation-models",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "xpersona",
+      "name": "Xpersona",
+      "name_zh": "Xpersona",
+      "base_url_template": "https://www.xpersona.co/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://www.xpersona.co/docs",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "zeldoc",
+      "name": "Zeldoc",
+      "name_zh": "Zeldoc",
+      "base_url_template": "https://api.zeldoc.ai/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.zeldoc.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "zenifra",
+      "name": "Zenifra",
+      "name_zh": "Zenifra",
+      "base_url_template": "https://ai.zenifra.com/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.zenifra.com",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    },
+    {
+      "key": "zenmux",
+      "name": "ZenMux",
+      "name_zh": "ZenMux",
+      "base_url_template": "https://zenmux.ai/api/v1",
+      "base_url_variables": [],
+      "auth_scheme": "bearer",
+      "featured": false,
+      "doc": "https://docs.zenmux.ai",
+      "default_api_formats": [
+        "chat_completions"
+      ],
+      "kind": "api"
+    }
+  ]
+}

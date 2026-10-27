@@ -1,0 +1,24 @@
+[package]
+name = "solidway-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+# 数据面引擎：纯内存。
+# 硬约束：不得依赖 sqlx / 数据库驱动，不得读取配置文件。
+[dependencies]
+axum.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+hex.workspace = true
+reqwest.workspace = true
+futures-util.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+gcp_auth = "0.12"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

@@ -1,0 +1,35 @@
+[workspace]
+members = ["crates/*"]
+exclude = ["app"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "AGPL-3.0-only"
+
+[workspace.dependencies]
+axum = "0.8"
+axum-extra = { version = "0.10", features = ["cookie"] }
+tower-http = { version = "0.6", features = ["fs", "set-header"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream"] }
+sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio", "migrate"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+argon2 = "0.5"
+aes-gcm = "0.10"
+hkdf = "0.12"
+sha2 = "0.10"
+hmac = "0.12"
+rand = "0.8"
+uuid = { version = "1", features = ["v4"] }
+base64 = "0.22"
+hex = "0.4"
+zeroize = "1"
+time = { version = "0.3", features = ["local-offset"] }
+thiserror = "2"
+async-trait = "0.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

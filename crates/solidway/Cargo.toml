@@ -1,0 +1,51 @@
+[package]
+name = "solidway"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Self-hosted LLM gateway with pooled provider credentials"
+
+[[bin]]
+name = "solidway"
+path = "src/main.rs"
+
+[dependencies]
+solidway-api = { path = "../solidway_api" }
+axum.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[package.metadata.deb]
+maintainer = "Zhuo Wei <zeaphoo@qq.com>"
+copyright = "2026, Solidway contributors"
+section = "net"
+priority = "optional"
+depends = "$auto, ca-certificates, adduser"
+recommends = "systemd"
+extended-description = """\
+Solidway is a self-hosted LLM gateway. It provides faithful forwarding, \
+provider pooling, health-aware failover, API keys, and usage accounting.
+
+This package installs the standalone service and a systemd unit."""
+assets = [
+    ["target/release/solidway", "usr/bin/", "755"],
+    ["../../packaging/deb/copyright", "usr/share/doc/solidway/copyright", "644"],
+]
+maintainer-scripts = "../../packaging/deb"
+systemd-units = { unit-scripts = "../../packaging/systemd", enable = true, start = true }
+
+[package.metadata.generate-rpm]
+summary = "Self-hosted LLM gateway with pooled provider credentials"
+license = "AGPL-3.0-only"
+url = "https://github.com/zeaphoo/solidway"
+assets = [
+    { source = "target/release/solidway", dest = "/usr/bin/solidway", mode = "755" },
+    { source = "../../packaging/systemd/solidway.service", dest = "/usr/lib/systemd/system/solidway.service", mode = "644" },
+    { source = "../../LICENSE", dest = "/usr/share/licenses/solidway/LICENSE", mode = "644" },
+]
+pre_install_script = "../../packaging/rpm/pre_install.sh"
+post_install_script = "../../packaging/rpm/post_install.sh"
+pre_uninstall_script = "../../packaging/rpm/pre_uninstall.sh"
+post_uninstall_script = "../../packaging/rpm/post_uninstall.sh"
+requires = { "ca-certificates" = "*", "shadow-utils" = "*", "systemd" = "*" }

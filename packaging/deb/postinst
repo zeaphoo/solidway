@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+if ! getent group solidway >/dev/null; then
+    addgroup --system --quiet solidway
+fi
+
+if ! getent passwd solidway >/dev/null; then
+    adduser --system --quiet --ingroup solidway \
+        --home /var/lib/solidway \
+        --no-create-home \
+        --disabled-login \
+        --shell /usr/sbin/nologin \
+        solidway
+fi
+
+install -d -o solidway -g solidway -m 0750 /var/lib/solidway
+
+#DEBHELPER#
+
+exit 0

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>Solidway</title>
+    <style>
+      :root {
+        --bg: #0a0b0d;
+        --fg: #e6e8eb;
+        --muted: #8b949e;
+        --accent: #00e5a0;
+        --danger: #ff6b6b;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+      }
+      main { width: min(560px, 86vw); text-align: center; }
+      .mark { width: 64px; height: 64px; margin: 0 auto 20px; }
+      h1 { font-size: 20px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.01em; }
+      #status { margin: 0; color: var(--accent); font-size: 14px; }
+      #status.error { color: var(--danger); }
+      #hint {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+        display: none;
+      }
+      #hint.show { display: block; }
+      #detail {
+        margin: 18px 0 0;
+        padding: 12px 14px;
+        min-height: 0;
+        max-height: 40vh;
+        overflow: auto;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--muted);
+        font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+        text-align: left;
+        white-space: pre-wrap;
+        word-break: break-all;
+        display: none;
+      }
+      #detail.show { display: block; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M27 13v-2.5A4.5 4.5 0 0 0 22.5 6h-13A4.5 4.5 0 0 0 5 10.5V13"
+              stroke="#00e5a0" stroke-width="2.6" stroke-linecap="round" />
+        <path d="M5 19v2.5A4.5 4.5 0 0 0 9.5 26h13a4.5 4.5 0 0 0 4.5-4.5V19"
+              stroke="#00e5a0" stroke-width="2.6" stroke-linecap="round" />
+        <circle cx="16" cy="16" r="3" fill="#00e5a0" />
+      </svg>
+      <h1>Solidway</h1>
+      <p id="status">正在启动 Solidway…</p>
+      <p id="hint"></p>
+      <pre id="detail"></pre>
+    </main>
+
+    <script>
+      // 仅由 Rust 侧通过 eval 调用；本页无框架、不发起网络请求。
+      // (status, hint, detail, failed)：failed 为真时标题用错误色。
+      window.solidwaySetStatus = function (text, hint, detail, failed) {
+        var status = document.getElementById('status')
+        status.textContent = text || ''
+        status.classList.toggle('error', Boolean(failed))
+
+        var hintBox = document.getElementById('hint')
+        if (hint) {
+          hintBox.textContent = hint
+          hintBox.classList.add('show')
+        } else {
+          hintBox.textContent = ''
+          hintBox.classList.remove('show')
+        }
+
+        var box = document.getElementById('detail')
+        if (detail) {
+          box.textContent = detail
+          box.classList.add('show')
+        } else {
+          box.textContent = ''
+          box.classList.remove('show')
+        }
+      }
+    </script>
+  </body>
+</html>

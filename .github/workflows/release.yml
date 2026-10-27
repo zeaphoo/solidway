@@ -1,0 +1,285 @@
+name: Release
+
+# 发布只由 v* 标签触发；workflow_dispatch 仅用于演练（默认不出 Release）。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的标签（如 v0.1.0；publish=true 时必填）'
+        type: string
+        required: false
+        default: ''
+      publish:
+        description: '创建 GitHub Release（否则只上传 artifacts）'
+        type: boolean
+        default: false
+      with_mac:
+        description: '构建 macOS 产物（需要签名 secrets）'
+        type: boolean
+        default: true
+
+# 同一标签的重复推送不互相取消：发布过程不能被并发打断。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10'
+  # mac 签名身份：与 scripts/package-mac.sh 的默认值保持一致。
+  MAC_SIGN_IDENTITY: ${{ secrets.MAC_SIGN_IDENTITY || 'AKSL Software' }}
+
+jobs:
+  verify:
+    name: verify tag & versions
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tag matches manifests
+        id: version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="$INPUT_TAG"
+          fi
+          if [[ -n "$tag" ]]; then
+            version="$(./scripts/check-release-version.sh "$tag")"
+          else
+            version="$(./scripts/check-release-version.sh)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release version: $version"
+
+  linux-service:
+    name: linux service packages (deb/rpm)
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install packaging tools
+        run: |
+          cargo install cargo-deb --locked
+          cargo install cargo-generate-rpm --locked
+      - name: Build packages
+        run: ./scripts/package-linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-service
+          path: |
+            dist/linux/*.deb
+            dist/linux/*.rpm
+          if-no-files-found: error
+
+  linux-app:
+    name: linux desktop client (deb/AppImage)
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            app -> target
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libgtk-3-dev \
+            libxdo-dev \
+            patchelf \
+            file
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --locked
+      - name: Build client
+        run: ./scripts/package-linux-app.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-app
+          path: dist/linux-app/*
+          if-no-files-found: error
+
+  mac:
+    name: macos client (${{ matrix.arch }})
+    needs: verify
+    if: github.event_name == 'push' || inputs.with_mac
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            arch: x86_64
+          - runner: macos-14
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            app -> target
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Check signing secrets
+        env:
+          P12: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: |
+          if [[ -z "$P12" || -z "$PASSWORD" ]]; then
+            echo "::error::缺少 MAC_CERT_P12_BASE64 / MAC_CERT_PASSWORD。macOS 产物必须签名（禁 ad-hoc），见 docs/adr/0011-mac-desktop-packaging-and-signing.md 的修订记录；只想出 Linux 产物可手动触发并关闭 with_mac。"
+            exit 1
+          fi
+      - name: Import signing identity into temporary keychain
+        env:
+          P12: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/solidway-signing.keychain-db"
+          keychain_pass="$(uuidgen)"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$keychain_pass" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_pass" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$keychain_pass" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$keychain"
+          rm -f "$RUNNER_TEMP/cert.p12"
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --locked
+      - name: Build and sign app
+        run: ./scripts/package-mac.sh
+      - name: Verify signature
+        run: |
+          set -euo pipefail
+          app="$(ls -d dist/mac/*.app)"
+          codesign --verify --deep --strict "$app"
+          codesign -dv --verbose=2 "$app" 2>&1 | grep -E 'Authority|flags='
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.arch }}
+          path: dist/mac/*.dmg
+          if-no-files-found: error
+      - name: Remove temporary keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/solidway-signing.keychain-db" 2>/dev/null || true
+
+  windows-app:
+    name: windows client (nsis/msi + portable)
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            app -> target
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --locked
+      - name: Build client
+        shell: bash
+        run: ./scripts/package-windows.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
+          path: dist/windows/*
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: [verify, linux-service, linux-app, mac, windows-app]
+    # skipped 的 mac job（演练时关闭 with_mac）不阻塞发布；任一产物失败则不发 Release。
+    if: >-
+      always()
+      && (startsWith(github.ref, 'refs/tags/v')
+      || (github.event_name == 'workflow_dispatch' && inputs.publish))
+      && needs.linux-service.result == 'success'
+      && needs.linux-app.result == 'success'
+      && needs.windows-app.result == 'success'
+      && (needs.mac.result == 'success' || needs.mac.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require tag for manual publish
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [[ "$GITHUB_REF_TYPE" != "tag" && -z "$INPUT_TAG" ]]; then
+            echo "::error::手动发布必须提供 tag 输入（如 v0.1.0）。"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Collect release files
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find dist -type f \
+            \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' \
+               -o -name '*.exe' -o -name '*.msi' -o -name '*.zip' \) \
+            -exec cp -v {} release/ \;
+          ls -lh release
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
+          name: ${{ format('Solidway v{0}', needs.verify.outputs.version) }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release/*

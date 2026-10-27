@@ -1,0 +1,29 @@
+{
+  "model": "claude-sonnet-4-6",
+  "max_tokens": 1024,
+  "messages": [
+    {"role": "user", "content": "Compare weather in Beijing and Shanghai"},
+    {
+      "role": "assistant",
+      "content": [
+        {"type": "thinking", "thinking": "Need two weather calls.", "signature": "sig_parallel"},
+        {"type": "text", "text": "Checking both."},
+        {"type": "tool_use", "id": "toolu_1", "name": "get_weather", "input": {"city": "Beijing"}},
+        {"type": "tool_use", "id": "toolu_2", "name": "get_weather", "input": {"city": "Shanghai"}}
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {"type": "tool_result", "tool_use_id": "toolu_1", "content": [{"type": "text", "text": "sunny"}]},
+        {"type": "tool_result", "tool_use_id": "toolu_2", "content": [{"type": "text", "text": "rainy"}]}
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_weather",
+      "input_schema": {"type": "object", "properties": {"city": {"type": "string"}}}
+    }
+  ]
+}

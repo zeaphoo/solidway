@@ -1,0 +1,3 @@
+{"id":"resp_1","object":"chat.completion.chunk","created":1792748397,"model":"gpt-5.1","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+{"id":"resp_1","object":"chat.completion.chunk","created":1792748397,"model":"gpt-5.1","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
+{"id":"resp_1","object":"chat.completion.chunk","created":1792748397,"model":"gpt-5.1","choices":[{"index":0,"delta":{"content":""},"finish_reason":"stop"}]}

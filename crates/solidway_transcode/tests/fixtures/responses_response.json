@@ -1,0 +1,42 @@
+{
+  "id": "resp_123",
+  "object": "response",
+  "created_at": 1760000000,
+  "model": "gpt-5.1",
+  "status": "completed",
+  "output": [
+    {
+      "type": "reasoning",
+      "id": "rs_1",
+      "encrypted_content": "enc_blob",
+      "summary": [{"type": "summary_text", "text": "Thinking..."}]
+    },
+    {
+      "type": "message",
+      "id": "msg_1",
+      "role": "assistant",
+      "status": "completed",
+      "content": [{"type": "output_text", "text": "The weather is sunny.", "annotations": []}]
+    },
+    {
+      "type": "function_call",
+      "id": "fc_1",
+      "call_id": "call_1",
+      "name": "get_weather",
+      "arguments": "{\"city\":\"Beijing\"}",
+      "status": "completed"
+    }
+  ],
+  "usage": {
+    "input_tokens": 100,
+    "output_tokens": 20,
+    "total_tokens": 120,
+    "input_tokens_details": {"cached_tokens": 40},
+    "output_tokens_details": {"reasoning_tokens": 10}
+  },
+  "service_tier": "default",
+  "parallel_tool_calls": true,
+  "tool_choice": "auto",
+  "metadata": {"trace": "abc"},
+  "vendor_meta": {"trace": "abc"}
+}

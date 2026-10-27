@@ -1,0 +1,1 @@
+{"id":"chatcmpl-truncated","object":"chat.completion.chunk","created":1760000000,"model":"gpt-5.1","choices":[{"index":0,"delta":{"content":"partial"},"finish_reason":null}]}

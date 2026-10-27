@@ -1,0 +1,17 @@
+{
+  "id": "resp_1",
+  "object": "response",
+  "created_at": 1,
+  "model": "m",
+  "status": "completed",
+  "output": [
+    {
+      "type": "message",
+      "id": "msg_1",
+      "role": "assistant",
+      "status": "completed",
+      "content": [{"type": "output_text", "text": "hi"}]
+    }
+  ],
+  "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
+}

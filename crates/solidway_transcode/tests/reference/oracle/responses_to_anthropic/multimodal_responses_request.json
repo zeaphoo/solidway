@@ -1,0 +1,1 @@
+{"model":"gpt-5.1","max_tokens":8192,"messages":[{"role":"user","content":[{"text":"Describe this image and document.","type":"text"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"iVBORw0KGgo="}},{"type":"document","source":{"type":"base64","media_type":"application/pdf","data":"JVBERi0xLjQ="}}]}]}

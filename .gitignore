@@ -1,0 +1,62 @@
+# Coding Agents
+.agent/
+.claude/
+.cline/
+.clinerules/
+.codebuddy/
+.codex/
+# 允许 CI workflow 入库（其余 .github 内容不入库）
+.github/*
+!.github/workflows/
+.kimi-code/
+.opencode/
+.pi/
+.qoder/
+
+# 注意：特意不忽略 .agents/（openspec skills 需要入库）
+
+# Rust
+/target
+crates/*/target/
+**/*.rs.bk
+
+# Node / 前端
+node_modules/
+.pnpm-store/
+web/node_modules/
+web/dist/
+web/dist-ssr/
+*.local
+
+# Tauri 桌面壳（app/，独立于 crates workspace）
+app/target/
+app/gen/
+# 打包时临时注入的网关二进制（bundle.resources 的源）
+app/solidway
+app/solidway.exe
+
+# 环境变量与本地配置
+.env
+.env.*
+
+# SQLite 本地运行产物
+*.db
+*.db-shm
+*.db-wal
+
+# SDD 流程临时产物（评审稿/反馈稿等，不入库）
+tmp/
+
+# solidway 运行时数据（data_root 下生成）
+master.key
+config.toml
+
+# 系统与编辑器
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Linux service packages
+/dist/
+app/.bundle-resources.json

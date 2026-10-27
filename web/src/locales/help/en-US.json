@@ -1,0 +1,157 @@
+{
+  "title": "Help",
+  "subtitle": "Concepts, common tasks, client snippets and troubleshooting. Check “My environment” before reporting an issue — it saves a round trip.",
+  "toc": "Contents",
+  "open": "Open",
+  "goOnboarding": "New here? Start with the quick start",
+  "searchPlaceholder": "Search, e.g. 403 / model / certificate",
+  "searchEmpty": "No matching content — try another keyword",
+  "sections": {
+    "concepts": {
+      "title": "Concepts",
+      "desc": "Three objects: a route is where traffic comes in, provider credentials are where it goes out, API keys are who is calling.",
+      "keywords": "concept glossary route provider credential api key quota domain"
+    },
+    "tasks": {
+      "title": "Common tasks",
+      "desc": "In the order you usually do them; every step links to the page it happens on.",
+      "keywords": "task create add rotate disable archive"
+    },
+    "snippets": {
+      "title": "Client snippets",
+      "desc": "SDK calls and terminal agent configs. The key is a placeholder — replace it with your own API key.",
+      "keywords": "snippet sdk curl python node claude code codex opencode pi config"
+    },
+    "troubleshoot": {
+      "title": "Troubleshooting",
+      "desc": "Grouped by how the gateway reacts: permanent retirement vs. cooldown and failover.",
+      "keywords": "troubleshoot error 401 403 cooldown retired certificate model"
+    },
+    "diagnostics": {
+      "title": "My environment",
+      "desc": "Read-only diagnostics for this instance; screenshot or copy it when reporting an issue.",
+      "keywords": "environment diagnostics version mode address health support"
+    },
+    "faq": {
+      "title": "FAQ",
+      "desc": "Pooling, transparent failover, credential storage and quota domains.",
+      "keywords": "faq why is how secure credential storage quota"
+    }
+  },
+  "items": {
+    "concept-route": {
+      "title": "Route",
+      "body": "A route is the single entry point backed by a pool of upstream accounts. Scripts only know the address the route exposes — not which account or region serves them. Routes belong to their creator: even an admin only sees their own routes.",
+      "keywords": "route entry base url"
+    },
+    "concept-provider-key": {
+      "title": "Provider credential",
+      "body": "One provider credential is one upstream account, with its endpoint, model list and inbound formats. All credentials under a route serve together; the gateway picks one by the selection strategy and, when one is unavailable, switches accounts before the first byte so scripts never notice.",
+      "keywords": "provider credential upstream account model selection"
+    },
+    "concept-api-key": {
+      "title": "API key",
+      "body": "An API key is the caller's credential, bound to one route. Scripts use it to reach the gateway. The plaintext is shown exactly once at creation; afterwards only the mask and prefix are visible.",
+      "keywords": "api key secret caller plaintext mask"
+    },
+    "concept-quota-domain": {
+      "title": "Quota domain",
+      "body": "The quota domain is the unit of pooling: the quota of one upstream account belongs to a domain, and a key is merely that domain's credential. The same account can therefore serve several routes, while usage is still attributed per call.",
+      "keywords": "quota domain pooling attribution billing"
+    },
+    "task-create-route": {
+      "title": "Create a route",
+      "body": "Use the plus next to “Routes” in the sidebar, or “New” in the empty state. Name is required, description optional; saving takes you straight to the route detail page.",
+      "keywords": "create new route"
+    },
+    "task-add-provider": {
+      "title": "Add upstream accounts",
+      "body": "Open the route detail page and click “New” in the provider section: pick a preset (OpenAI, Anthropic, Gemini, …), paste the upstream credential, adjust inbound formats if needed. Saving fetches the model list automatically.",
+      "keywords": "add upstream provider preset credential models"
+    },
+    "task-create-key": {
+      "title": "Create an API key",
+      "body": "On the API keys page click “New”, choose the route, set a name and expiry. The plaintext is shown once — copy it into your script or a password manager before closing.",
+      "keywords": "create api key plaintext expiry"
+    },
+    "task-rotate-key": {
+      "title": "Rotate an API key",
+      "body": "Create the new key on the same route first, switch the script over and confirm calls succeed, then delete the old key. Never delete before creating — the gap breaks the script.",
+      "keywords": "rotate change key migrate rolling delete"
+    },
+    "task-disable-route": {
+      "title": "Disable a route temporarily",
+      "body": "Turn off the switch at the top of the route detail page: it stops forwarding while keeping config and credentials. Flip it back to resume. Use “Archive” only when you are done for good.",
+      "keywords": "disable switch archive delete"
+    },
+    "trouble-401": {
+      "title": "401: credential invalid",
+      "body": "A 401 from upstream means the credential is unusable. The gateway treats it as permanent retirement and quarantines the account: it stops participating in selection and needs manual recovery. Once the upstream account works again, an admin clicks “Clear” in the health column on the route page.",
+      "keywords": "401 unauthorized invalid retired quarantine restore"
+    },
+    "trouble-403": {
+      "title": "403: account anomaly",
+      "body": "A 403 only means this request was rejected — it does not prove the account is banned. The gateway treats the account as temporarily unavailable and fails over: it cools down while other credentials serve, then rejoins selection automatically.",
+      "keywords": "403 forbidden cooldown failover ban"
+    },
+    "trouble-cooldown": {
+      "title": "Everything is cooling down",
+      "body": "Cooldown durations live in “System → Gateway”. If every credential is cooling down, check upstream rate limits or exhausted quota; the health column shows when the longest cooldown ends.",
+      "keywords": "cooldown rate limit quota unavailable"
+    },
+    "trouble-no-model": {
+      "title": "Model list empty or not probeable",
+      "body": "Without a model list the gateway can neither probe health nor route traffic. Edit the provider and click “Fetch models”, or add a model mapping manually.",
+      "keywords": "model list empty not probeable"
+    },
+    "trouble-tls": {
+      "title": "Certificate not ready",
+      "body": "“System → HTTPS” shows the certificate state. Waiting usually means DNS or ports 80 / 443 are not reachable; paused means issuance hit its limit — fix the cause and click “Retry”.",
+      "keywords": "certificate tls https acme issue port domain"
+    },
+    "faq-switch": {
+      "title": "Where does “transparent failover” end?",
+      "body": "It is guaranteed only before the first byte: switching accounts before any response byte reaches the script is invisible. If upstream dies after the stream started, the gateway will not splice two responses — the script sees an error and must retry.",
+      "keywords": "transparent failover first byte streaming retry"
+    },
+    "faq-tls": {
+      "title": "Is TLS mandatory?",
+      "body": "Not for a purely internal deployment. Once employee scripts or terminal agents reach the gateway over a public network it is required, otherwise API keys travel in plaintext in every request header.",
+      "keywords": "tls https required public network plaintext security"
+    },
+    "faq-credentials": {
+      "title": "Where are upstream credentials stored?",
+      "body": "In the local SQLite database (`solidway.db` under `data_root`), with sensitive fields encrypted using `master.key`. The console only ever shows masks.",
+      "keywords": "credential storage encryption master key database sqlite privacy"
+    },
+    "faq-quota": {
+      "title": "Can several employees share one upstream account?",
+      "body": "Yes — that is the point of pooling. The account belongs to a quota domain; each employee uses an API key on their own route, and usage is attributed per call.",
+      "keywords": "share account pooling multiple users attribution"
+    },
+    "faq-scripts": {
+      "title": "What do existing scripts need to change?",
+      "body": "Usually two fields: `base_url` pointing at the gateway, and `api_key` set to the key the gateway issued. Protocol families are not translated.",
+      "keywords": "script migrate base url api key compatible zero change"
+    },
+    "faq-delete": {
+      "title": "Disable vs. archive vs. delete",
+      "body": "Disable keeps config but stops forwarding; archive removes it from lists and the sidebar, makes the detail read-only and cannot be undone; API keys and provider credentials can be deleted for real.",
+      "keywords": "disable archive delete difference recovery"
+    }
+  },
+  "diagnostics": {
+    "hint": "Read-only information, useful when reporting an issue.",
+    "copy": "Copy diagnostics",
+    "version": "Version",
+    "mode": "Run mode",
+    "listen": "Listening on",
+    "baseUrl": "Base URL",
+    "origin": "Current origin",
+    "health": "Unhealthy credentials",
+    "healthValue": "{{cooldown}} cooling down / {{retired}} retired",
+    "healthHint": "Credentials whose health is not normal",
+    "healthEmpty": "No unhealthy credentials right now",
+    "incidents": "Recent open incidents (up to 5)"
+  }
+}

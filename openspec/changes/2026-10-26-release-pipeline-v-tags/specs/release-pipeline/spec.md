@@ -1,0 +1,116 @@
+# release-pipeline Specification (delta: release-pipeline-v-tags)
+
+## Purpose
+
+定义 `solidway` 的发布流水线：以 `v*` 标签为唯一发布触发点，产出并挂载 Linux 服务包、Linux 桌面客户端与 macOS 桌面客户端，并保证 tag 与代码内版本一致。
+
+## ADDED Requirements
+
+### Requirement: 标签触发的发布流水线
+
+仓库 SHALL 提供 `.github/workflows/release.yml`，其发布触发条件 MUST 仅为推送 `v*` 形式的标签。
+
+工作流 MUST 额外支持手动触发（`workflow_dispatch`）用于演练，手动触发默认 MUST NOT 创建 GitHub Release，除非显式提交 `publish=true`。
+
+同一标签的重复推送 MUST NOT 相互取消（发布过程 MUST NOT 被并发打断）。
+
+#### Scenario: 推送标签发布
+- **WHEN** 维护者推送标签 `v0.1.0`
+- **THEN** 工作流构建全部产物并创建/更新对应的 GitHub Release
+
+#### Scenario: 普通分支推送不发布
+- **WHEN** 向 `main` 或任意分支推送提交
+- **THEN** 发布工作流不触发（常规构建与测试仍由 `ci.yml` 负责）
+
+#### Scenario: 手动演练不发布
+- **WHEN** 维护者手动触发工作流且未勾选 `publish`
+- **THEN** 只上传 workflow artifacts，不创建 Release
+
+#### Scenario: 非 v 标签不发布
+- **WHEN** 推送的标签不匹配 `v*`
+- **THEN** 发布工作流不触发
+
+### Requirement: 版本一致性闸门
+
+发布工作流 MUST 在任何构建开始前校验版本一致性：标签 `v<version>` 的 `version` MUST 等于 `app/tauri.conf.json` 的 `version`，且 MUST 等于全部 `crates/*` 与 `app/` 的 `Cargo.toml` 中的包版本。
+
+校验 MUST 由可独立执行的脚本提供（`scripts/check-release-version.sh`），支持不传标签时只校验清单之间的一致性；非 `v` 前缀的标签 MUST 被拒绝。
+
+校验失败时工作流 MUST 立即失败，MUST NOT 产出任何发布物。
+
+#### Scenario: 版本一致
+- **WHEN** 标签为 `v0.1.0` 且所有清单版本均为 `0.1.0`
+- **THEN** 校验通过，输出裸版本号供后续任务使用
+
+#### Scenario: 标签与清单不一致
+- **WHEN** 标签为 `v0.2.0` 但清单版本仍为 `0.1.0`
+- **THEN** 校验失败并指出不一致的文件，工作流不构建任何产物
+
+#### Scenario: 清单之间不一致
+- **WHEN** `app/tauri.conf.json` 与某个 crate 的版本不同
+- **THEN** 校验失败并列出差异
+
+#### Scenario: 标签格式非法
+- **WHEN** 传入的标签不是 `v` 前缀（如 `0.1.0` 或 `release-0.1.0`）
+- **THEN** 校验失败
+
+### Requirement: 发布产物集
+
+发布工作流 SHALL 产出并挂载以下产物：
+
+- Linux 服务包：`.deb` 与 `.rpm`（含 systemd unit），由 `scripts/package-linux.sh` 构建；
+- Linux 桌面客户端：`.deb` 与 `.AppImage`，由 Tauri bundler 构建，MUST 自带 `solidway` 网关二进制（`bundle.resources`，落点为打包器资源目录）；`.deb` 的包名 MUST 与服务包 `solidway` 不同（使用 `solidway-app`），避免 dpkg 视为同名包互相替换；
+- Windows 桌面客户端：NSIS（或 MSI）安装包 MUST 把 `solidway.exe` 安装到与应用可执行文件同一目录；另 MUST 提供便携 zip（`Solidway.exe` + `solidway.exe` 同目录）。Windows 产物 MAY 未做代码签名，但 MUST 在分发说明中标注 SmartScreen 影响与 WebView2 前提；
+- macOS 桌面客户端：`.dmg`，由 `scripts/package-mac.sh` 构建，签名口径 MUST 为 AKSL 自签 + hardened runtime。
+
+客户端产物文件名 MUST 统一以 `solidway-app_` 为前缀（含版本与架构），服务包 MUST 使用 `solidway_` 前缀，二者 MUST NOT 混淆；架构名 MUST 遵循各平台惯例（Linux `amd64`/`arm64`、Windows `x64`、macOS `x86_64`/`arm64`）。
+
+任一产物缺失时发布任务 MUST 失败（MUST NOT 发布不完整产物集）。
+
+#### Scenario: 产物齐全
+- **WHEN** 所有构建任务成功
+- **THEN** Release 页面包含 Linux 服务包、Linux 客户端包、Windows 安装包与便携 zip、macOS dmg
+
+#### Scenario: 客户端与服务包文件名可区分
+- **WHEN** 下载 Releases 页面的全部产物
+- **THEN** 客户端产物均为 `solidway-app_<ver>_<arch>[.<ext>]`，服务包均为 `solidway_<ver>-<rev>_<arch>`，仅看文件名即可区分用途
+
+#### Scenario: Linux 客户端单装可用
+- **WHEN** 用户只安装 Linux 桌面客户端（未安装服务包，PATH 中没有 `solidway`）
+- **THEN** 客户端从自带资源中启动网关，控制台可正常打开
+
+#### Scenario: Windows 安装目录可自洽运行
+- **WHEN** 用户安装 Windows 安装包或解压便携 zip
+- **THEN** `Solidway.exe` 与 `solidway.exe` 位于同一目录，应用无需额外安装服务即可启动网关
+
+#### Scenario: Windows 产物未签名
+- **WHEN** 用户首次运行 Windows 产物
+- **THEN** 分发说明 MUST 已提示 SmartScreen 可能告警以及 WebView2 运行时前提
+
+#### Scenario: 产物缺失
+- **WHEN** 任一构建任务失败或未产出预期文件
+- **THEN** Release 不被创建/更新
+
+### Requirement: macOS 构建的签名前提
+
+macOS 构建任务 MUST 从仓库 secrets（`MAC_CERT_P12_BASE64`、`MAC_CERT_PASSWORD`，可选 `MAC_SIGN_IDENTITY`）导入签名身份到临时 keychain，并在构建后执行 `codesign --verify --deep --strict` 自检。
+
+secrets 缺失或签名自检失败时任务 MUST 失败，MUST NOT 产出未签名或 ad-hoc 签名的产物，MUST NOT 提供跳过签名的开关。
+
+macOS 产物 MUST 按 runner 原生架构分别构建（x86_64 与 arm64 各一份）。
+
+#### Scenario: 签名成功
+- **WHEN** secrets 已配置且证书链完整
+- **THEN** 产出通过 `codesign --verify --deep --strict` 的 dmg，并上传
+
+#### Scenario: 未配置签名 secrets
+- **WHEN** `MAC_CERT_P12_BASE64` 或 `MAC_CERT_PASSWORD` 为空
+- **THEN** 任务立即失败并提示所需 secrets，不产出任何 mac 产物
+
+#### Scenario: 签名身份不匹配
+- **WHEN** 导入的证书不含预期身份（默认 `AKSL Software`）
+- **THEN** `find-identity` / `codesign` 校验失败，任务失败
+
+#### Scenario: 双架构产物
+- **WHEN** macOS 矩阵两个 runner 均成功
+- **THEN** Release 同时包含 arm64 与 x86_64 的 dmg

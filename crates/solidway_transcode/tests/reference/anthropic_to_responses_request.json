@@ -1,0 +1,79 @@
+{
+  "model": "claude-sonnet-4-6",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Compare weather in Beijing and Shanghai"
+        }
+      ]
+    },
+    {
+      "type": "reasoning",
+      "encrypted_content": "sig_parallel"
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "Checking both."
+        }
+      ]
+    },
+    {
+      "type": "function_call",
+      "call_id": "toolu_1",
+      "name": "get_weather",
+      "arguments": "{\"city\": \"Beijing\"}"
+    },
+    {
+      "type": "function_call",
+      "call_id": "toolu_2",
+      "name": "get_weather",
+      "arguments": "{\"city\": \"Shanghai\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "toolu_1",
+      "output": "sunny"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "toolu_2",
+      "output": "rainy"
+    }
+  ],
+  "max_output_tokens": 1024,
+  "tools": [
+    {
+      "type": "function",
+      "name": "get_weather",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        }
+      },
+      "strict": false
+    }
+  ],
+  "include": [
+    "reasoning.encrypted_content"
+  ],
+  "store": false,
+  "parallel_tool_calls": true,
+  "reasoning": {
+    "effort": "medium",
+    "summary": "auto"
+  },
+  "text": {
+    "verbosity": "medium"
+  }
+}

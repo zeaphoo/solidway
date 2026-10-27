@@ -1,0 +1,6 @@
+{"id":"msg_1","object":"chat.completion.chunk","created":1792750441,"model":"claude-sonnet-4-6","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+{"id":"msg_1","object":"chat.completion.chunk","created":1792750441,"model":"claude-sonnet-4-6","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
+{"id":"msg_1","object":"chat.completion.chunk","created":1792750441,"model":"claude-sonnet-4-6","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"toolu_1","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}
+{"id":"msg_1","object":"chat.completion.chunk","created":1792750441,"model":"claude-sonnet-4-6","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"city\":"}}]},"finish_reason":null}]}
+{"id":"msg_1","object":"chat.completion.chunk","created":1792750441,"model":"claude-sonnet-4-6","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"Beijing\"}"}}]},"finish_reason":null}]}
+{"id":"msg_1","object":"chat.completion.chunk","created":1792750441,"model":"claude-sonnet-4-6","choices":[{"index":0,"delta":{"content":""},"finish_reason":"tool_calls"}]}

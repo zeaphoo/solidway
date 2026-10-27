@@ -1,0 +1,37 @@
+{
+  "model": "gpt-5.1",
+  "instructions": "You are a helpful assistant.",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {"type": "input_text", "text": "What is the weather?"},
+        {"type": "input_image", "image_url": "https://example.com/cat.png", "detail": "high"}
+      ]
+    },
+    {"type": "function_call", "call_id": "call_1", "name": "get_weather", "arguments": "{\"city\":\"Beijing\"}"},
+    {"type": "function_call_output", "call_id": "call_1", "output": "sunny"}
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "name": "get_weather",
+      "description": "Get weather for a city",
+      "parameters": {"type": "object", "properties": {"city": {"type": "string"}}},
+      "strict": true
+    }
+  ],
+  "tool_choice": {"type": "function", "name": "get_weather"},
+  "max_output_tokens": 1024,
+  "stream": true,
+  "store": false,
+  "parallel_tool_calls": true,
+  "reasoning": {"effort": "medium", "summary": "auto"},
+  "text": {"format": {"type": "json_schema", "name": "answer", "schema": {"type": "object"}}, "verbosity": "medium"},
+  "include": ["reasoning.encrypted_content"],
+  "prompt_cache_key": "cache-1",
+  "previous_response_id": "resp_1",
+  "metadata": {"trace": "abc"},
+  "vendor_flag": true
+}

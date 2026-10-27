@@ -1,0 +1,42 @@
+[Unit]
+Description=Solidway LLM Gateway
+Documentation=https://github.com/zeaphoo/solidway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=solidway
+Group=solidway
+WorkingDirectory=/var/lib/solidway
+StateDirectory=solidway
+StateDirectoryMode=0750
+ExecStart=/usr/bin/solidway /var/lib/solidway --mode standalone
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGTERM
+UMask=0077
+LimitNOFILE=65536
+
+# 支持内置 HTTPS 监听 80/443；不需要低端口时可以删除这三行。
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+
+# 基础收敛：只允许写数据目录，证书/数据库/master.key 都在这里。
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/solidway
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+SyslogIdentifier=solidway
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

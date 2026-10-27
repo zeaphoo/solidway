@@ -1,0 +1,16 @@
+{
+  "model": "gpt-5.1",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "Describe this image and document."},
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,iVBORw0KGgo=", "detail": "high"}},
+        {
+          "type": "file",
+          "file": {"filename": "spec.pdf", "file_data": "data:application/pdf;base64,JVBERi0xLjQ="}
+        }
+      ]
+    }
+  ]
+}

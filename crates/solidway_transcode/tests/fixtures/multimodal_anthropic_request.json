@@ -1,0 +1,20 @@
+{
+  "model": "claude-sonnet-4-6",
+  "max_tokens": 1024,
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "Describe this image and document."},
+        {
+          "type": "image",
+          "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="}
+        },
+        {
+          "type": "document",
+          "source": {"type": "base64", "media_type": "application/pdf", "data": "JVBERi0xLjQ="}
+        }
+      ]
+    }
+  ]
+}

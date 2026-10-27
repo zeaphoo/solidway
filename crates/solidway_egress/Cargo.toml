@@ -1,0 +1,11 @@
+[package]
+name = "solidway-egress"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Pure egress identity/header planning for SolidWay private upstream protocols"
+
+[dependencies]
+solidway-transcode = { path = "../solidway_transcode" }
+serde_json.workspace = true
+thiserror.workspace = true

@@ -1,0 +1,41 @@
+{
+  "model": "gpt-5.1",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [{"type": "input_text", "text": "Compare weather in Beijing and Shanghai"}]
+    },
+    {
+      "type": "reasoning",
+      "encrypted_content": "anthropic-thinking-v1:{\"type\":\"thinking\",\"thinking\":\"Need two weather calls.\",\"signature\":\"sig_parallel\"}",
+      "summary": [{"type": "summary_text", "text": "Need two weather calls."}]
+    },
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [{"type": "output_text", "text": "Checking both."}]
+    },
+    {
+      "type": "function_call",
+      "call_id": "call_1",
+      "name": "get_weather",
+      "arguments": "{\"city\":\"Beijing\"}"
+    },
+    {
+      "type": "function_call",
+      "call_id": "call_2",
+      "name": "get_weather",
+      "arguments": "{\"city\":\"Shanghai\"}"
+    },
+    {"type": "function_call_output", "call_id": "call_1", "output": "sunny"},
+    {"type": "function_call_output", "call_id": "call_2", "output": "rainy"}
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "name": "get_weather",
+      "parameters": {"type": "object", "properties": {"city": {"type": "string"}}}
+    }
+  ]
+}

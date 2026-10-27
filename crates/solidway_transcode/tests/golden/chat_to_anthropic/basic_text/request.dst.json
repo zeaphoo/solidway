@@ -1,0 +1,7 @@
+{
+  "model": "m",
+  "max_tokens": 8192,
+  "messages": [
+    {"role": "user", "content": [{"type": "text", "text": "hi"}]}
+  ]
+}

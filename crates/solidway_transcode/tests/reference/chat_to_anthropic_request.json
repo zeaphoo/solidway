@@ -1,0 +1,64 @@
+{
+  "model": "gpt-5.1",
+  "max_tokens": 8192,
+  "messages": [
+    {
+      "role": "user",
+      "content": "Compare weather in Beijing and Shanghai"
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "text": "\u003cthinking\u003eNeed two weather calls.\u003c/thinking\u003e\nChecking both.",
+          "type": "text"
+        },
+        {
+          "type": "tool_use",
+          "id": "call_1",
+          "name": "get_weather",
+          "input": {
+            "city": "Beijing"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "call_2",
+          "name": "get_weather",
+          "input": {
+            "city": "Shanghai"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "call_1",
+          "content": "sunny"
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "call_2",
+          "content": "rainy"
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_weather",
+      "input_schema": {
+        "properties": {
+          "city": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    }
+  ],
+  "stream": true
+}

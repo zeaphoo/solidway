@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Solidway 桌面壳：纯 Rust，无 JS 权限需求",
+  "windows": ["splash", "main"],
+  "permissions": []
+}

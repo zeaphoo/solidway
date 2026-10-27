@@ -1,0 +1,3 @@
+{"type":"response.created","response":{"id":"resp_truncated","object":"response","created_at":1760000000,"model":"gpt-5.1","status":"in_progress","output":[]},"sequence_number":0}
+{"type":"response.output_item.added","output_index":0,"item":{"type":"message","id":"msg_1","role":"assistant","status":"in_progress","content":[]},"sequence_number":1}
+{"type":"response.output_text.delta","item_id":"msg_1","output_index":0,"content_index":0,"delta":"partial","sequence_number":2}
