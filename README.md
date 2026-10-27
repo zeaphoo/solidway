@@ -8,43 +8,24 @@
 
 **A Rust LLM gateway that forwards requests unchanged.**
 
-Solidway sits between your application and your model providers. Request bodies, response bodies, header order and streaming frame boundaries travel through it byte for byte, while failover, load balancing, circuit breaking and telemetry run alongside the forward path.
+Solidway sits between your application and your model providers. Request bodies, response bodies, header order and streaming frame boundaries travel through it byte for byte, while failover, account health and usage attribution run alongside the forward path.
 
----
+It is built for a specific shape of deployment: an organization owns a set of model accounts, puts them in a pool, and lets its own employees and scripts share them. Accounts belong to you; Solidway never sells access to models.
 
-> ## Status
->
-> The open-source gateway and the enterprise edition are being split out of a single deployment. **No code has been published yet.**
->
-> Watch or star this repository to be notified when the first release lands.
+[![CI](https://github.com/zeaphoo/solidway/actions/workflows/ci.yml/badge.svg)](https://github.com/zeaphoo/solidway/actions/workflows/ci.yml)
 
 ---
 
 ## Contents
 
-- [Why this exists](#why-this-exists)
 - [Features](#features)
 - [What Solidway does not do](#what-solidway-does-not-do)
+- [Failure classification](#failure-classification)
 - [Comparison with other gateways](#comparison-with-other-gateways)
-- [Design notes](#design-notes)
+- [Distribution](#distribution)
 - [Status](#status)
-
----
-
-## Why this exists
-
-Most gateways earn their place by changing your traffic. They take what your SDK produced, translate it into a unified schema, and render it into whichever provider dialect you are calling. That buys vendor independence, and it costs predictability.
-
-| What gets given up | Why it matters |
-|---|---|
-| Prompt cache hits | Rewriting a request prefix invalidates the provider's cache, which raises both cost and latency |
-| New parameters | A parameter a provider shipped this week may be dropped by the gateway until its adapter catches up |
-| Faithful debugging | What you observe is the gateway's rendering of your request, not your request |
-| Byte-level guarantees | Content passes through gateway memory, where a middleware layer can alter it |
-
-Solidway is built around the opposite constraint: **the forward path does not touch the payload.**
-
-Routing, health and accounting are decided per request, outside the bytes you send.
+- [License](#license)
+- [Further reading](#further-reading)
 
 ---
 
@@ -52,124 +33,85 @@ Routing, health and accounting are decided per request, outside the bytes you se
 
 ### Forwarding
 
-- Byte-for-byte request and response bodies
-- Streaming frames passed through with their original chunk boundaries
-- No schema translation, no dropped fields, no rewritten prompts
-- Header order preserved
+- Three inbound protocol families, each forwarded on its own terms: OpenAI Chat Completions (`/v1/chat/completions`), OpenAI Responses (`/v1/responses`), Anthropic Messages (`/v1/messages`).
+- Request and response bodies preserved byte for byte; header order preserved; no prompt rewriting, so provider prompt caches keep working.
+- Streaming frames pass through with their original chunk boundaries.
+- No cross-protocol translation on the forward path: a client speaks the dialect its provider expects.
 
 ### Reliability
 
-- **Failover** — ordered fallback chains across providers, models and keys. Each attempt carries its own timeout budget, so a slow primary cannot consume the whole request deadline.
-- **Load balancing** — weighted distribution across keys and endpoints, with health-aware scoring that adjusts to observed latency and error rates rather than a fixed table.
-- **Circuit breaking** — a target that reports a credential, quota, access or rate-limit failure is held out of rotation, and returns to service after a single probe confirms it can serve again.
+- **Pooled accounts** — a route is a pool of provider credentials. Selection is weighted and health-aware (observed latency, error rate, cooldown state) rather than a fixed table.
+- **Failover before the first byte** — if a response has not started, the gateway switches to another credential and the client never sees the failed attempt.
+- **Failure classification** — a rejected credential (`401`) retires an account until an operator restores it; rate limits, exhausted quota and access errors put it into a timed cooldown. Errors caused by the request itself never remove an account from rotation.
+- **Probing** — held-out accounts are checked by a probe and return to rotation on their own once they can serve again.
 
 ### Operations
 
-- **Self-hosted** — one static binary. Docker, Kubernetes or bare metal, inside your own network. No external control plane is contacted at runtime.
-- **Analytics** — requests, tokens, cost and latency broken down by provider, model, key and workspace, so spend can be attributed to the team that produced it.
-- **Capacity alerts** — threshold and trend alerts for quota usage, error rate and p99 latency, delivered to email, Slack or a webhook before a limit is reached.
-- **Observability** — OpenTelemetry (OTLP), Prometheus scraping, structured JSON logs and webhooks.
-
-### Runtime
-
-- No garbage collector, so the tail of the latency distribution does not carry collection pauses
-- Throughput scales with available cores; steady-state memory is bounded by the configured connection pools rather than by a heap
-- One file to ship, for x86-64 and arm64
-
----
+- **Self-hosted, one static binary** — data plane and management plane are one process with the console embedded. No external control plane is contacted at runtime.
+- **Console** — routes, provider credentials (masked, encrypted at rest), API keys, per-route and global usage, incidents, users, system settings and built-in TLS. Chinese and English.
+- **Usage attribution** — requests, tokens, latency and error rate broken down by route, API key, provider, model and owner, so spend can be attributed to the team that produced it.
+- **Incidents and alerts** — provider failures are recorded with duration and attempt counts; alerts are delivered to a webhook with retry and per-provider throttling.
+- **Built-in HTTPS** — certificates issued and renewed through ACME (`http-01` or `tls-alpn-01`) for domains you configure, or terminate TLS in front of Solidway.
+- **Provider catalog** — presets generated from models.dev, including endpoint templates for Vertex, Azure and Bedrock (SigV4), with model discovery from the upstream.
 
 ## What Solidway does not do
 
-Stated plainly, because it decides whether this is the right tool for you:
+- **No schema translation.** If you want to call Claude through the OpenAI SDK, this is the wrong tool.
+- **No content moderation, no prompt rewriting, no response rewriting.**
+- **No resale of model access.** It is a gateway for accounts you already own.
+- **No container images, no Prometheus/OTLP exporter, no email/Slack alerting (webhook only).** See [Status](#status).
 
-- **It does not translate between provider dialects.** Calling Claude through the OpenAI SDK, or any model through another vendor's SDK, is out of scope by design.
-- **It does not ship a prebuilt adapter for every provider.** A provider is reached by configuration, not by an adapter module.
-
-If either of those is a requirement, one of the projects in the next section is a better fit.
-
----
-
-## Comparison with other gateways
-
-All of these are LLM gateways, but they answer a different question: *what should the gateway do to a request on its way through?* The table lists what could be verified against each project itself.
-
-| | **Solidway** | **Bifrost** | **LiteLLM** |
-|---|---|---|---|
-| What the gateway does to a request | Forwards it unchanged | Converts to a unified schema, then to the provider format | Converts to a unified schema, then to the provider format |
-| Implementation language | Rust | Go | Python |
-| Calling vendor A with vendor B's SDK | Not supported, by design | Supported | Supported |
-| Adding a provider | Configuration change | Adapter code | Adapter code |
-| Failover | Built in | Built in | Built in |
-| Load balancing | Built in | Built in; adaptive balancing is a commercial-edition feature | Built in, with several published strategies |
-| Circuit breaking | Built in | A commercial-edition feature | Deployment cooldown and retry budgets |
-| Deployment shape | One static binary | One static binary or a container | A Python service or a container |
-
-Where a capability is offered only in a commercial edition, the table says so rather than marking it absent.
-
-### When one of these is the better choice
-
-- You want to call Claude through the OpenAI SDK, or switch dialects without touching application code → **Bifrost** or **LiteLLM**
-- You need ready-made adapters across a long list of providers → **LiteLLM**
-- You want to change gateway behaviour in Python, in the same language as the rest of your stack → **LiteLLM**
-- You want a unified schema plus governance, budgets and a plugin system around it → **Bifrost**
-
-### Sources
-
-Each row was checked against the projects themselves. Products change; check their documentation before deciding.
-
-- **Bifrost** — source and documentation reviewed in October 2026 · <https://github.com/maximhq/bifrost>
-- **LiteLLM** — version 1.82.0, MIT licensed · <https://github.com/BerriAI/litellm>
-
----
-
-## Design notes
-
-### Transparent by design
-
-The request path has three stages, and only the middle one is ours.
-
-```
-Client  ──►  Solidway  ──►  Provider
-              routing
-              accounting
-              health
-```
-
-- **No schema translation.** What your SDK sends is what the provider receives. A model parameter a provider ships works the day it ships, without waiting for a gateway release.
-- **Streaming stays streaming.** Server-sent event frames are forwarded as they arrive, so client-side parsing and incremental rendering behave the same with and without the gateway in the path.
-- **Routing decisions are explicit.** Which target served a request, why a fallback was taken, and how long each attempt took are recorded in the routing trail attached to that request.
-
-### How a failure is classified
-
-The class decides whether a target is retried, rotated or held. Errors caused by the request itself never hold a target out of rotation.
+## Failure classification
 
 | Class | Retry | Hold |
 |---|---|---|
 | Transient (network, 5xx) | Same target, with backoff | No |
-| Rate limit | Rotate key | Yes, short |
-| Credential rejected | Rotate key, no backoff | Yes |
-| Quota exhausted | Rotate key, no backoff | Yes |
-| Model not accessible | Rotate key, no backoff | Yes, that model |
+| Rate limit | Rotate credential | Yes, timed cooldown |
+| Credential rejected (401) | Rotate credential, no backoff | Yes, until an operator restores it |
+| Quota exhausted | Rotate credential, no backoff | Yes, timed cooldown |
+| Model not accessible | Rotate credential, no backoff | Yes, for that model |
 | Request rejected by provider | No | No |
 
----
+## Comparison with other gateways
+
+| | Solidway | LiteLLM | Bifrost |
+|---|---|---|---|
+| Primary goal | Forward unchanged | Unified schema | Unified schema + governance |
+| Language | Rust | Python | Go |
+| Calls vendor A with vendor B's SDK | Not supported, by design | Supported | Supported |
+| Adding a provider | Configuration change | Adapter code | Adapter code |
+| Failover | Built in | Built in | Built in |
+| Load balancing | Built in, health-aware | Built in | Built in |
+| Circuit breaking | Built in | Commercial edition | Deployment cooldown |
+| Deployment shape | One static binary | Service or container | Binary or container |
+
+Sources: Bifrost and LiteLLM project documentation, reviewed October 2026. Products change; check their docs before deciding.
+
+## Distribution
+
+- **Server** — one static binary, distributed as `deb` and `rpm` packages with a systemd unit, or run from the release archive. Linux.
+- **Desktop** — a Tauri application for Linux, Windows and macOS that supervises the gateway locally and opens the console in a webview; each package ships the gateway binary.
+- **Upgrades** — settings, accounts and usage live in a local SQLite database, so upgrading means replacing the binary or package.
 
 ## Status
 
-|  | Status |
+| | |
 |---|---|
-| Open-source gateway | Being split out |
-| Enterprise edition | Being split out |
-| First release | Not yet scheduled |
-| License | To be determined |
-| Documentation | Not yet published |
+| Version | `0.1.0`, pre-1.0 — interfaces may change between minor releases |
+| Source | Complete implementation in this repository |
+| Platforms | Linux (server + desktop), macOS (desktop), Windows (desktop) |
+| License | AGPL-3.0-only |
+| Not yet available | Container images, Prometheus/OTLP, email/Slack alerting, cross-protocol transcode wiring, code signing/notarization |
 
-The open-source gateway and the enterprise edition are being separated from a single deployment. Capabilities that end up in the enterprise edition will be listed explicitly rather than left implied, and the comparison table above already marks commercial-edition features as such for the other projects.
+## License
 
-**敬请稍后 — please check back shortly.**
+AGPL-3.0-only. You can run, modify and self-host it freely. If you offer a modified version to others **as a network service**, the AGPL requires you to give those users access to the corresponding source.
 
----
+Running Solidway internally, or as a service to your own employees, carries no such obligation. Commercial support and licensing for cases the AGPL does not fit are available — open an issue or contact the maintainer.
 
-## Contact
+## Further reading
 
-If you would like to talk through where a forward path fits in your architecture, open an issue on this repository.
+- [Getting started](docs/getting-started.md) — build, run, deploy, desktop packages, data directory and backups
+- [Architecture](docs/architecture.md) — process layout, crates, data model
+- [Contributing](CONTRIBUTING.md) — development workflow and required checks
+- [Design decisions](docs/adr/), [domain glossary](docs/domain-context.md), [behaviour specs](openspec/specs/)
