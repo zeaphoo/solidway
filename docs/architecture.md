@@ -60,6 +60,19 @@ inbound match ──► resolve route (by API key) ──► select credential
                  record usage + release slot
 ```
 
+### What may be modified
+
+Forwarding is byte-faithful apart from an explicit whitelist of five changes: the inbound
+credential header is replaced with the credential's own; the destination is rebuilt from the
+credential's base URL and path template; credential-bearing query parameters (`key`,
+`api_key`) are removed; the top-level `model` in the request is rewritten when a client-facing
+alias maps to a different upstream id; and the top-level `model` in a **successful** response
+is written back to the client-facing name. Models that are not aliased are left untouched.
+
+Headers are forwarded by value. Order and letter casing are not preserved — the HTTP layer
+stores headers in a map — so an upstream that signature-checks raw header bytes is not
+supported.
+
 Failover happens only before the first byte reaches the client; after that the response is committed and an upstream failure is surfaced as an error rather than spliced.
 
 ## Data model

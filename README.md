@@ -8,7 +8,7 @@
 
 **A Rust LLM gateway that forwards requests unchanged.**
 
-Solidway sits between your application and your model providers. Request bodies, response bodies, header order and streaming frame boundaries travel through it byte for byte, while failover, account health and usage attribution run alongside the forward path.
+Solidway sits between your application and your model providers. Request bodies, response bodies and streaming frame boundaries travel through it byte for byte, while failover, account health and usage attribution run alongside the forward path.
 
 It is built for a specific shape of deployment: an organization owns a set of model accounts, puts them in a pool, and lets its own employees and scripts share them. Accounts belong to you; Solidway never sells access to models.
 
@@ -34,7 +34,7 @@ It is built for a specific shape of deployment: an organization owns a set of mo
 ### Forwarding
 
 - Three inbound protocol families, each forwarded on its own terms: OpenAI Chat Completions (`/v1/chat/completions`), OpenAI Responses (`/v1/responses`), Anthropic Messages (`/v1/messages`).
-- Request and response bodies preserved byte for byte; header order preserved; no prompt rewriting, so provider prompt caches keep working.
+- Request and response bodies preserved byte for byte, with one exception: the top-level `model` field is rewritten when a credential maps a client-facing alias to a different upstream id. No prompt rewriting, so provider prompt caches keep working.
 - Streaming frames pass through with their original chunk boundaries.
 - No cross-protocol translation on the forward path: a client speaks the dialect its provider expects.
 
