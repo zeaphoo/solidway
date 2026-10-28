@@ -99,16 +99,64 @@ mkdir -p "$DIST_DIR/portable"
 # 两个名字必须在**大小写不敏感**的文件系统上也不同，否则便携包会少一个 exe。
 cp -f "$APP_EXE" "$DIST_DIR/portable/SolidwayApp.exe"
 cp -f "$SOLIDWAY_EXE" "$DIST_DIR/portable/solidway.exe"
-cat > "$DIST_DIR/portable/README.txt" <<'TXT'
-Solidway 便携版
-===============
+cat > "$DIST_DIR/portable/README.txt" <<TXT
+Solidway 便携版 ${version} (x64)          Solidway portable ${version} (x64)
+================================================================================
 
-直接运行 SolidwayApp.exe 即可（会在 %APPDATA%\xyz.solidway 建数据目录）。
+启动 / Run
+  Double-click SolidwayApp.exe —— 免安装、免管理员权限，不写系统目录。
+  应用会在本机启动网关并打开控制台，托盘图标常驻。
+  Double-click SolidwayApp.exe. No installer or admin rights needed; the app
+  starts the gateway locally and opens the console. It stays in the tray.
 
-- solidway.exe 必须与 SolidwayApp.exe 放在同一目录：桌面壳按「应用可执行文件同目录」
-  查找网关二进制，找不到会在界面报错。
-- 需要 WebView2 运行时（Windows 10 1803+ 通常已随 Edge 安装）。
-- 本包未做代码签名，SmartScreen 可能提示「未知发布者」，选择「仍要运行」即可。
+目录结构 / Layout
+  SolidwayApp.exe   桌面应用 / desktop app
+  solidway.exe      网关 / gateway —— 必须与 SolidwayApp.exe 同目录
+  README.txt        本说明 / this file
+
+首次启动 / First run
+  桌面模式免登录，自动以管理员进入控制台。
+  管理员口令是可选项，需要时在「个人」页设置（用于浏览器登录或共享给团队）。
+  Desktop mode signs in automatically as admin. A password is optional and can
+  be set under Profile — it is only needed for browser or shared access.
+
+数据目录 / Data directory
+  %APPDATA%\xyz.solidway
+  solidway.db        用户、路由、Provider 凭据（加密）、设置
+  usage_detail.db    逐条用量明细
+  master.key         加密主密钥 —— 必须与 solidway.db 一起备份
+  solidway.log       日志
+  没有 master.key，数据库里的 Provider 凭据无法解密。
+  Back up solidway.db and master.key together; without the key, stored provider
+  credentials cannot be decrypted.
+
+局域网访问 / LAN access
+  默认只监听 127.0.0.1:6565。要让其他机器使用，在控制台「系统 → 网络」修改绑定地址，
+  并在对外暴露前开启 HTTPS（「系统 → HTTPS」）。
+  Listens on 127.0.0.1:6565 by default. For other machines, change the bind
+  address under System → Network and enable HTTPS before exposing it.
+
+退出 / Quit
+  托盘菜单「退出」会同时停止网关；只关闭窗口则网关继续在托盘运行。
+  Tray → Quit stops the gateway. Closing the window keeps it running.
+
+WebView2
+  Windows 10 1803+ 通常已随 Edge 安装。若提示缺少运行时，安装 Evergreen
+  Bootstrapper 后重试：https://developer.microsoft.com/microsoft-edge/webview2/
+  Usually present on Windows 10 1803+. If missing, install the Evergreen
+  Bootstrapper from the URL above and try again.
+
+未签名 / Unsigned build
+  本包未做代码签名，SmartScreen 可能提示「未知发布者」：选择「更多信息 → 仍要运行」。
+  Not code-signed: SmartScreen may warn about an unknown publisher. Choose
+  "More info" → "Run anyway".
+
+卸载 / Uninstall
+  删除本目录即可；如需清除数据，再删除 %APPDATA%\xyz.solidway。
+  Delete this folder. To remove data as well, delete %APPDATA%\xyz.solidway.
+
+许可证 / License
+  AGPL-3.0-only — https://github.com/zeaphoo/solidway/blob/main/LICENSE
 TXT
 
 ZIP="$DIST_DIR/solidway-app_${version}_x64_portable.zip"
