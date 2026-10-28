@@ -965,14 +965,27 @@ impl Supervisor {
             (FailureKind::SpawnFailed, format!("复制日志句柄失败：{error}"))
         })?;
 
-        let child = Command::new(bin)
+        let mut command = Command::new(bin);
+        command
             .arg(&self.config.data_root)
             .arg("--mode")
             .arg("desktop")
             // stdin 是存活信号：壳死亡时管道关闭，子进程读到 EOF 即退出。
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::from(log_err))
+            .stderr(Stdio::from(log_err));
+
+        // Windows：网关是控制台子系统程序（这样独立运行时终端能看到 stdout 事件），
+        // 由壳拉起时 MUST NOT 弹出黑色控制台窗口。CREATE_NO_WINDOW (0x0800_0000)
+        // 只影响本次派生，不改变二进制本身的子系统类型。
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            command.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let child = command
             .spawn()
             .map_err(|error| {
                 (

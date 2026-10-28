@@ -8,7 +8,7 @@
 |---|---|---|
 | Linux 服务 | `solidway_<ver>-1_<arch>.deb`、`solidway-<ver>-1.<arch>.rpm`（systemd） | `scripts/package-linux.sh` |
 | Linux 客户端 | `solidway-app_<ver>_<arch>.deb`、`solidway-app_<ver>_<arch>.AppImage`（均自带网关） | `scripts/package-linux-app.sh` |
-| Windows 客户端 | `solidway-app_<ver>_x64-setup.exe`（NSIS）、`solidway-app_<ver>_x64.msi`、`solidway-app_<ver>_x64_portable.zip` | `scripts/package-windows.sh` |
+| Windows 客户端 | `solidway-app_<ver>_x64-setup.exe`（NSIS，中英双语）、`solidway-app_<ver>_x64_<locale>.msi`、`solidway-app_<ver>_x64_portable.zip` | `scripts/package-windows.sh` |
 | macOS 客户端 | `solidway-app_<ver>_<arch>.dmg`（x86_64 / arm64 各一份） | `scripts/package-mac.sh` |
 
 命名约定：**客户端产物统一 `solidway-app_<ver>_<arch>[.<ext>]`**，服务包统一 `solidway_<ver>-<rev>_<arch>`；
@@ -190,10 +190,17 @@ Linux 构建需要 Tauri 的系统依赖（`libwebkit2gtk-4.1-dev`、`libayatana
 默认输出到 `dist/windows/`：
 
 ```text
-solidway-app_<version>_x64-setup.exe    # NSIS
-solidway-app_<version>_x64.msi          # WiX（TAURI_BUNDLES 含 msi 时）
+solidway-app_<version>_x64-setup.exe      # NSIS（中英双语 + 语言选择）
+solidway-app_<version>_x64_en-US.msi      # WiX，按语言各一份（TAURI_BUNDLES 含 msi 时）
+solidway-app_<version>_x64_zh-CN.msi
 solidway-app_<version>_x64_portable.zip # 便携版（两个 exe 同目录）
 ```
+
+### 安装器语言
+
+- **NSIS（默认）**：`bundle.windows.nsis` 配置了 `["SimpChinese", "English"]` 且 `displayLanguageSelector: true`——系统语言命中就用对应语言，未命中时让用户选。
+- **MSI（可选）**：`bundle.windows.wix.language` 为 `["en-US", "zh-CN"]`，因此每个语言产出一个 MSI，文件名保留 locale 后缀（`…_en-US.msi` / `…_zh-CN.msi`）。
+- **WebView2**：`webviewInstallMode` 显式设为 `downloadBootstrapper`（静默安装），缺运行时的机器装完即可用。
 
 ### 命名：为什么是 `SolidwayApp.exe`
 

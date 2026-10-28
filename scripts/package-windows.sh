@@ -177,7 +177,12 @@ fi
 for file in "${installers[@]}"; do
     case "$file" in
         *.exe) out="solidway-app_${version}_x64-setup.exe" ;;
-        *.msi) out="solidway-app_${version}_x64.msi" ;;
+        *.msi)
+            # WiX 按 wix.language 每个语言出一个 MSI（Solidway_<ver>_x64_en-US.msi），
+            # 保留语言后缀，避免多语言产物互相覆盖。
+            locale="${file##*_}"
+            out="solidway-app_${version}_x64_${locale}"
+            ;;
         *)     out="$(basename "$file")" ;;
     esac
     cp -f "$file" "$DIST_DIR/$out"

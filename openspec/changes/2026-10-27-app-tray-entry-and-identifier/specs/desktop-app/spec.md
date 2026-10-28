@@ -30,25 +30,41 @@
 
 ### Requirement: 托盘图标的点击行为
 
-在 Windows 上，双击托盘图标 MUST 打开控制台（复用「打开控制台」同一路径）；左键单击 MUST NOT 弹出菜单，右键 MUST 仍然弹出菜单。
+在 Windows 上，**左键单击**托盘图标 MUST 打开控制台（复用「打开控制台」同一路径）；左键单击 MUST NOT 弹出菜单，右键 MUST 弹出菜单；双击 MAY 同样打开（该路径幂等：窗口已存在则只前置）。
 
 macOS 与 Linux MUST NOT 因本需求改变左键行为：macOS 保持左键弹出菜单；Linux 托盘后端（AppIndicator / ksni）不派发点击事件，打开控制台 MUST 依赖菜单项。
 
-#### Scenario: Windows 双击打开控制台
-- **WHEN** 用户在 Windows 上双击托盘图标
-- **THEN** 控制台窗口被打开（已存在则前置），页面不重新加载
-
-#### Scenario: Windows 左键单击不弹菜单
+#### Scenario: Windows 单击打开控制台
 - **WHEN** 用户在 Windows 上左键单击托盘图标
-- **THEN** 不弹出菜单；右键单击才弹出菜单
+- **THEN** 控制台窗口被打开（已存在则前置并聚焦），页面不重新加载，且不弹出菜单
+
+#### Scenario: Windows 右键菜单
+- **WHEN** 用户在 Windows 上右键单击托盘图标
+- **THEN** 弹出托盘菜单
+
+#### Scenario: Windows 双击不产生额外副作用
+- **WHEN** 用户快速双击托盘图标
+- **THEN** 控制台窗口仍只有一个，前台可见，不重复创建窗口
 
 #### Scenario: macOS 保持菜单习惯
 - **WHEN** 用户在 macOS 上左键单击托盘图标
-- **THEN** 弹出菜单（与改动前一致），双击不额外触发行为
+- **THEN** 弹出菜单（与改动前一致）
 
 #### Scenario: Linux 只走菜单
 - **WHEN** 用户在 Linux 上点击托盘图标
 - **THEN** 弹出菜单；打开控制台通过菜单项完成（后端不派发点击事件）
+
+### Requirement: 托管子进程不显示控制台窗口
+
+Windows 上应用派生子进程时 MUST 使用不创建控制台窗口的派生方式（如 `CREATE_NO_WINDOW`）；MUST NOT 通过把网关改成 GUI 子系统来隐藏窗口——网关独立运行（命令行 / 服务）时 MUST 保持控制台子系统，stdout 事件对调用方可见。
+
+#### Scenario: 桌面启动无黑窗
+- **WHEN** 用户从桌面应用启动 Solidway（含开机自启）
+- **THEN** 不出现任何控制台窗口，只有托盘图标与（按需的）控制台界面
+
+#### Scenario: 独立运行仍有输出
+- **WHEN** 用户在命令行直接运行 `solidway.exe <data_root> --mode standalone`
+- **THEN** `solidway: listening …`、`bootstrap …` 等事件照常打印在终端
 
 ## MODIFIED Requirements
 

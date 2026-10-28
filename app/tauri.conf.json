@@ -28,6 +28,25 @@
     "copyright": "Copyright © 2026 AKSL",
     "macOS": {
       "minimumSystemVersion": "10.13"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "languages": [
+          "SimpChinese",
+          "English"
+        ],
+        "displayLanguageSelector": true
+      },
+      "wix": {
+        "language": [
+          "en-US",
+          "zh-CN"
+        ]
+      }
     }
   },
   "mainBinaryName": "SolidwayApp"

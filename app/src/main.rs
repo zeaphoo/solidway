@@ -135,16 +135,22 @@ fn main() {
                 // 其他平台保持「左键出菜单」的既有习惯。
                 .show_menu_on_left_click(!cfg!(target_os = "windows"))
                 .on_tray_icon_event(|tray, event| {
-                    // 双击图标 = 打开控制台。
+                    // Windows：左键单击 = 打开控制台（右键仍然出菜单）。
+                    // 同时接受 DoubleClick：两次单击事件本身是幂等的（窗口存在则前置），
+                    // 保留它是为了不依赖 NSIS/系统对双击的合成行为。
                     //
                     // 平台差异（tray-icon 的硬限制，不是我们的取舍）：
-                    //   - Windows：派发 `DoubleClick`，本分支生效；
-                    //   - macOS：只有 `Click`（左键出菜单），没有 DoubleClick；
+                    //   - Windows：派发 `Click` / `DoubleClick`；
+                    //   - macOS：只有 `Click`，但左键默认出菜单；
                     //   - Linux：gtk/ksni 后端只支持菜单，不派发任何点击事件。
                     #[cfg(target_os = "windows")]
                     if matches!(
                         event,
-                        tauri::tray::TrayIconEvent::DoubleClick {
+                        tauri::tray::TrayIconEvent::Click {
+                            button: tauri::tray::MouseButton::Left,
+                            button_state: tauri::tray::MouseButtonState::Up,
+                            ..
+                        } | tauri::tray::TrayIconEvent::DoubleClick {
                             button: tauri::tray::MouseButton::Left,
                             ..
                         }
