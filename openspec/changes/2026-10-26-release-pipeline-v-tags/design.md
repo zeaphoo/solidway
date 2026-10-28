@@ -68,13 +68,13 @@ deb 包名：Tauri 的 deb 配置没有包名字段（`Package:` 由 productName
 
 ## 5. Windows 客户端：资源注入 + 便携包
 
-Windows 没有服务包形态，`solidway.exe` 必须与 `Solidway.exe` 同目录（`app/src/config.rs`
+Windows 没有服务包形态，`solidway.exe` 必须与 `SolidwayApp.exe` 同目录（`app/src/config.rs`
 的「可执行文件同目录」查找）。两种分发都保留：
 
 | 形态 | 内容 | 做法 |
 |---|---|---|
-| NSIS / MSI 安装包 | `Solidway.exe` + `solidway.exe` 安装到同一目录 | `app/tauri.windows.conf.json` 的 `bundle.resources` 把 `solidway.exe` 作为资源；Windows 的资源目录就是安装目录 |
-| 便携 zip | 两个 exe 同目录 + 说明 | 脚本直接把 `app/target/release/solidway-app.exe` 改名为 `Solidway.exe`，与 `solidway.exe` 一起压缩 |
+| NSIS / MSI 安装包 | `SolidwayApp.exe` + `solidway.exe` 安装到同一目录 | 打包期 `--config` 注入 `bundle.resources`（Windows 的资源目录就是安装目录） |
+| 便携 zip | 两个 exe 同目录 + 说明 | Tauri 按 `mainBinaryName` 输出 `SolidwayApp.exe`，与 `solidway.exe` 一起压缩 |
 
 为什么不用 `bundle.resources` 统一处理三平台：macOS 的资源目录是 `Contents/Resources`，
 与「可执行文件同目录」不一致（因此 mac 继续 post-copy 进 `Contents/MacOS`）；Linux 有服务包

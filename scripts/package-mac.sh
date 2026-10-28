@@ -93,8 +93,16 @@ if [[ ! -d "$APP_SRC" ]]; then
 fi
 
 # post-copy（D9）：solidway 必须与 app 可执行文件同目录。
+# 主程序名含大写（SolidwayApp），网关是小写 solidway —— 在大小写不敏感的 APFS 上
+# 也不能是只差大小写的名字，这里在复制后显式断言两个文件都存在。
 cp -f "$ROOT_TARGET/release/solidway" "$APP_SRC/Contents/MacOS/solidway"
 chmod +x "$APP_SRC/Contents/MacOS/solidway"
+for name in SolidwayApp solidway; do
+    if [[ ! -f "$APP_SRC/Contents/MacOS/$name" ]]; then
+        echo "app 包内缺少 Contents/MacOS/$name（检查主程序名是否与 solidway 只差大小写）" >&2
+        exit 1
+    fi
+done
 
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"

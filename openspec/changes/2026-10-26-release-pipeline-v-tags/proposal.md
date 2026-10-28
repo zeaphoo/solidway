@@ -20,7 +20,7 @@ ADR 0011 的「修订记录」已经预留了恢复路径：**负责人决定后
 2. 新增 `scripts/check-release-version.sh`：校验 tag 与 `app/tauri.conf.json` 及全部 crates 的版本一致（不一致即失败），版本号作为后续 job 的输出。
 3. Linux 服务包 job：复用 `scripts/package-linux.sh` 产出 deb / rpm。
 4. Linux 桌面客户端 job：新增 `scripts/package-linux-app.sh`，用 Tauri bundler 产出 `deb` + `AppImage`；运行时通过 PATH 使用服务包安装的 `/usr/bin/solidway`（app 自身不内嵌网关二进制）。
-5. Windows 桌面客户端 job：新增 `scripts/package-windows.sh`，产出 NSIS / MSI 安装包 + 便携 zip；安装包通过 `app/tauri.windows.conf.json` 的 `bundle.resources` 把 `solidway.exe` 注入安装目录（与 `Solidway.exe` 同目录），便携 zip 直接放两个 exe。
+5. Windows 桌面客户端 job：新增 `scripts/package-windows.sh`，产出 NSIS / MSI 安装包 + 便携 zip；安装包通过打包期 `--config` 注入的 `bundle.resources` 把 `solidway.exe` 安装到应用同目录（与 `SolidwayApp.exe` 同目录），便携 zip 直接放两个 exe。
 6. macOS job（matrix：`macos-13` x86_64 / `macos-14` arm64）：从 secrets 导入 AKSL p12 到临时 keychain → `scripts/package-mac.sh` → `codesign --verify --deep --strict` 自检 → 只上传 `.dmg`。secrets 缺失即失败（不降级、不打 ad-hoc 包）。
 7. release job：tag 触发时创建/更新 GitHub Release，挂载上述全部产物并生成 release notes；`workflow_dispatch` 默认只上传 artifacts。
 8. 文档与 ADR：ADR 0011 增补「2026-10-26 恢复 CI 打包」修订记录；新增 ADR 0018 记录发布流水线口径；`packaging/README.md` 与 `docs/tech-context.md` 同步（含所需 secrets 清单）。

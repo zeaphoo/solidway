@@ -18,9 +18,9 @@
 
 ## 2b. Windows 客户端脚本
 
-- [x] 2b.1 `app/tauri.windows.conf.json`：`bundle.resources` 把 `solidway.exe` 注入安装目录
+- [x] 2b.1 打包期 `--config` 注入 `bundle.resources`，把 `solidway.exe` 装进应用同目录
 - [x] 2b.2 `scripts/package-windows.sh`：Git Bash 校验 → 版本闸门 → 构建 `web/dist`（可跳过）→ `cargo build --release -p solidway` → 注入 `app/solidway.exe` → `cargo tauri build --bundles ${TAURI_BUNDLES:-nsis,msi}` → 收产物到 `dist/windows/`
-- [x] 2b.3 便携 zip：`Solidway.exe` + `solidway.exe` + `README.txt`（WebView2 前提、SmartScreen 说明），PowerShell `Compress-Archive`
+- [x] 2b.3 便携 zip：`SolidwayApp.exe` + `solidway.exe` + `README.txt`（WebView2 前提、SmartScreen 说明），PowerShell `Compress-Archive`
 - [x] 2b.4 `.gitignore` 忽略临时注入的 `app/solidway.exe`
 
 ## 3. 发布工作流

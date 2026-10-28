@@ -60,7 +60,7 @@
 
 - Linux 服务包：`.deb` 与 `.rpm`（含 systemd unit），由 `scripts/package-linux.sh` 构建；
 - Linux 桌面客户端：`.deb` 与 `.AppImage`，由 Tauri bundler 构建，MUST 自带 `solidway` 网关二进制（`bundle.resources`，落点为打包器资源目录）；`.deb` 的包名 MUST 与服务包 `solidway` 不同（使用 `solidway-app`），避免 dpkg 视为同名包互相替换；
-- Windows 桌面客户端：NSIS（或 MSI）安装包 MUST 把 `solidway.exe` 安装到与应用可执行文件同一目录；另 MUST 提供便携 zip（`Solidway.exe` + `solidway.exe` 同目录）。Windows 产物 MAY 未做代码签名，但 MUST 在分发说明中标注 SmartScreen 影响与 WebView2 前提；
+- Windows 桌面客户端：NSIS（或 MSI）安装包 MUST 把 `solidway.exe` 安装到与应用可执行文件同一目录；另 MUST 提供便携 zip（`SolidwayApp.exe` + `solidway.exe` 同目录）。应用主程序名 MUST 在忽略大小写后与 `solidway` 不同（Windows/macOS 文件系统不区分大小写），打包脚本 MUST 断言两个可执行文件都存在。Windows 产物 MAY 未做代码签名，但 MUST 在分发说明中标注 SmartScreen 影响与 WebView2 前提；
 - macOS 桌面客户端：`.dmg`，由 `scripts/package-mac.sh` 构建，签名口径 MUST 为 AKSL 自签 + hardened runtime。
 
 客户端产物文件名 MUST 统一以 `solidway-app_` 为前缀（含版本与架构），服务包 MUST 使用 `solidway_` 前缀，二者 MUST NOT 混淆；架构名 MUST 遵循各平台惯例（Linux `amd64`/`arm64`、Windows `x64`、macOS `x86_64`/`arm64`）。
@@ -81,7 +81,7 @@
 
 #### Scenario: Windows 安装目录可自洽运行
 - **WHEN** 用户安装 Windows 安装包或解压便携 zip
-- **THEN** `Solidway.exe` 与 `solidway.exe` 位于同一目录，应用无需额外安装服务即可启动网关
+- **THEN** `SolidwayApp.exe` 与 `solidway.exe` 位于同一目录，应用无需额外安装服务即可启动网关
 
 #### Scenario: Windows 产物未签名
 - **WHEN** 用户首次运行 Windows 产物

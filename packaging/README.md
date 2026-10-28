@@ -169,13 +169,13 @@ Linux 构建需要 Tauri 的系统依赖（`libwebkit2gtk-4.1-dev`、`libayatana
 
 ## Windows desktop app
 
-产出 NSIS 安装包、MSI（可选）与便携 zip；`solidway.exe` 与 `Solidway.exe` **必须同目录**
+产出 NSIS 安装包、MSI（可选）与便携 zip；`solidway.exe` 与 `SolidwayApp.exe` **必须同目录**
 （桌面壳按「应用可执行文件同目录」查找网关），两类产物都已处理：
 
 | 形态 | 做法 |
 |---|---|
 | 安装包（NSIS / MSI） | `app/tauri.windows.conf.json` 的 `bundle.resources` 把 `solidway.exe` 装到安装目录 |
-| 便携 zip | 直接放 `Solidway.exe` + `solidway.exe` + `README.txt`，免安装 |
+| 便携 zip | 直接放 `SolidwayApp.exe` + `solidway.exe` + `README.txt`，免安装 |
 
 ```bash
 ./scripts/package-windows.sh
@@ -194,6 +194,14 @@ solidway-app_<version>_x64-setup.exe    # NSIS
 solidway-app_<version>_x64.msi          # WiX（TAURI_BUNDLES 含 msi 时）
 solidway-app_<version>_x64_portable.zip # 便携版（两个 exe 同目录）
 ```
+
+### 命名：为什么是 `SolidwayApp.exe`
+
+Windows 与 macOS 默认的文件系统**不区分大小写**：`Solidway.exe` 与 `solidway.exe`
+会被当成同一个文件，打包时两者互相覆盖，最终只剩一个。因此应用主程序名定为
+`SolidwayApp.exe`（`tauri.conf.json` 的 `mainBinaryName`），与网关 `solidway.exe`
+在**忽略大小写后仍然不同**。脚本会在打包后断言两个文件都存在，安装包内容也会用
+7-Zip 列表校验。
 
 ### 未签名与运行前提
 

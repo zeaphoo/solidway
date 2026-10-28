@@ -220,7 +220,7 @@ mod tests {
         let exe_dir = root.join("usr/bin");
         let exe = exe_dir.join("solidway-app");
         touch(&exe);
-        // deb 布局：/usr/bin/solidway-app + /usr/lib/Solidway/solidway
+        // deb 布局：/usr/bin/SolidwayApp + /usr/lib/Solidway/solidway
         let resource = root.join("usr/lib/Solidway");
         touch(&resource.join("solidway"));
         let path_dir = root.join("path-dir");

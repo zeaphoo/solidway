@@ -8,8 +8,10 @@
 #   TAURI_BUNDLES=...    传给 tauri 的 bundle 列表，默认 nsis,msi
 #                        （没有 WiX 下载权限的环境可设 TAURI_BUNDLES=nsis）
 #
-# 与 Linux 不同：Windows 没有服务包形态，`solidway.exe` 必须与 `Solidway.exe`
-# 同目录（app/src/config.rs 的「可执行文件同目录」查找）。安装包通过打包期
+# 与 Linux 不同：Windows 没有服务包形态，`solidway.exe` 必须与应用主程序同目录
+# （app/src/config.rs 的「可执行文件同目录」查找）。应用主程序名为 `SolidwayApp.exe`
+# （tauri.conf.json 的 mainBinaryName）——**不能**叫 `Solidway.exe`：Windows 文件名
+# 大小写不敏感，会与 `solidway.exe` 撞成同一个文件。安装包通过打包期
 # `--config` 注入 bundle.resources（不落 app/tauri.*.conf.json）；便携 zip 直接放两个 exe。
 
 set -euo pipefail
@@ -84,7 +86,7 @@ rm -f "$INJECT_CONFIG"
 APP_TARGET="$(target_dir "$ROOT/app")"
 BUNDLE_DIR="$APP_TARGET/release/bundle"
 
-APP_EXE="$APP_TARGET/release/solidway-app.exe"
+APP_EXE="$APP_TARGET/release/SolidwayApp.exe"
 if [[ ! -f "$APP_EXE" ]]; then
     echo "未找到应用可执行文件 $APP_EXE" >&2
     exit 1
@@ -93,16 +95,17 @@ fi
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR/portable"
 
-# 便携包：Solidway.exe + solidway.exe 同目录（免安装、免管理员）。
-cp -f "$APP_EXE" "$DIST_DIR/portable/Solidway.exe"
+# 便携包：SolidwayApp.exe + solidway.exe 同目录（免安装、免管理员）。
+# 两个名字必须在**大小写不敏感**的文件系统上也不同，否则便携包会少一个 exe。
+cp -f "$APP_EXE" "$DIST_DIR/portable/SolidwayApp.exe"
 cp -f "$SOLIDWAY_EXE" "$DIST_DIR/portable/solidway.exe"
 cat > "$DIST_DIR/portable/README.txt" <<'TXT'
 Solidway 便携版
 ===============
 
-直接运行 Solidway.exe 即可（会在 %APPDATA%\com.solidway.app 建数据目录）。
+直接运行 SolidwayApp.exe 即可（会在 %APPDATA%\xyz.solidway 建数据目录）。
 
-- solidway.exe 必须与 Solidway.exe 放在同一目录：桌面壳按「应用可执行文件同目录」
+- solidway.exe 必须与 SolidwayApp.exe 放在同一目录：桌面壳按「应用可执行文件同目录」
   查找网关二进制，找不到会在界面报错。
 - 需要 WebView2 运行时（Windows 10 1803+ 通常已随 Edge 安装）。
 - 本包未做代码签名，SmartScreen 可能提示「未知发布者」，选择「仍要运行」即可。
@@ -130,6 +133,39 @@ for file in "${installers[@]}"; do
         *)     out="$(basename "$file")" ;;
     esac
     cp -f "$file" "$DIST_DIR/$out"
+done
+
+# 便携包断言：两个 exe 都必须真的存在（大小写不敏感的文件系统上名字撞车会丢一个）。
+for name in SolidwayApp.exe solidway.exe; do
+    if [[ ! -f "$DIST_DIR/portable/$name" ]]; then
+        echo "便携包缺少 $name（检查两个 exe 的文件名是否只差大小写）" >&2
+        exit 1
+    fi
+done
+
+# 安装包断言：NSIS 产物里必须同时含应用主程序与网关。
+# NSIS 是 7-Zip 能解析的格式；找不到 7z 时只告警（CI 的 windows runner 自带）。
+SEVEN_ZIP=""
+if command -v 7z >/dev/null 2>&1; then
+    SEVEN_ZIP="7z"
+elif [[ -x "/c/Program Files/7-Zip/7z.exe" ]]; then
+    SEVEN_ZIP="/c/Program Files/7-Zip/7z.exe"
+fi
+
+for file in "$DIST_DIR"/*-setup.exe; do
+    [[ -f "$file" ]] || continue
+    if [[ -z "$SEVEN_ZIP" ]]; then
+        echo "WARN: 未找到 7-Zip，跳过 $file 的内容断言" >&2
+        continue
+    fi
+    listing="$("$SEVEN_ZIP" l "$file" 2>/dev/null || true)"
+    for name in SolidwayApp.exe solidway.exe; do
+        if ! grep -qi "$name" <<<"$listing"; then
+            echo "安装包 ${file##*/} 内缺少 $name" >&2
+            exit 1
+        fi
+    done
+    echo "安装包内容断言通过：${file##*/} 含 SolidwayApp.exe + solidway.exe"
 done
 
 echo
