@@ -39,7 +39,8 @@
           "SimpChinese",
           "English"
         ],
-        "displayLanguageSelector": true
+        "displayLanguageSelector": true,
+        "installMode": "perMachine"
       },
       "wix": {
         "language": [

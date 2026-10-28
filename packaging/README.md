@@ -196,11 +196,20 @@ solidway-app_<version>_x64_zh-CN.msi
 solidway-app_<version>_x64_portable.zip # 便携版（两个 exe 同目录）
 ```
 
-### 安装器语言
+### 安装器语言与安装路径
 
-- **NSIS（默认）**：`bundle.windows.nsis` 配置了 `["SimpChinese", "English"]` 且 `displayLanguageSelector: true`——系统语言命中就用对应语言，未命中时让用户选。
-- **MSI（可选）**：`bundle.windows.wix.language` 为 `["en-US", "zh-CN"]`，因此每个语言产出一个 MSI，文件名保留 locale 后缀（`…_en-US.msi` / `…_zh-CN.msi`）。
-- **WebView2**：`webviewInstallMode` 显式设为 `downloadBootstrapper`（静默安装），缺运行时的机器装完即可用。
+- **NSIS（默认）**：`bundle.windows.nsis` 配置 `["SimpChinese", "English"]` +
+  `displayLanguageSelector: true`——系统语言命中就用对应语言，未命中时弹语言选择。
+  **改了语言配置必须重新打包**：安装器本身内嵌语言，旧产物不会自动带上中文。
+- **MSI（可选）**：`bundle.windows.wix.language = ["en-US", "zh-CN"]`，每个语言一个
+  MSI，文件名保留 locale 后缀（`…_en-US.msi` / `…_zh-CN.msi`）。
+- **安装路径统一为 `C:\Program Files\Solidway`**：
+  - NSIS 设了 `installMode: "perMachine"`（默认是 `currentUser`，会装到
+    `%LOCALAPPDATA%\Solidway`，与 MSI 不一致）；
+  - MSI（WiX）没有安装模式配置，一直是 per-machine；
+  - 两者都需要管理员权限（UAC）。
+- **WebView2**：`webviewInstallMode` 显式设为 `downloadBootstrapper`（静默安装），
+  缺运行时的机器装完即可用。
 
 ### 命名：为什么是 `SolidwayApp.exe`
 
