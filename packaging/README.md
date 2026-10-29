@@ -267,7 +267,7 @@ solidway-app_<version>_<arch>.dmg
 
 打包顺序固定（顺序错会产生不含 `solidway` 或未签名的坏 dmg）：
 `cargo build --release -p solidway` → `cargo tauri build --bundles app` →
-post-copy `solidway` 到 `Contents/MacOS/` → 内层 Mach-O 先签、`.app` 外层后签 →
+post-copy `solidway` 到 `Contents/MacOS/` → 非主程序内层 Mach-O 先签、`.app` 外层后签（`SolidwayApp` 随 bundle 签） →
 从**已签名**的 `.app` 用 `hdiutil` 生成 dmg → 挂载 dmg 断言内含 `solidway` 且
 `codesign --verify --deep --strict` 通过。**不得**使用 `cargo tauri build --bundles dmg`
 （bundler 会重建 `.app`，覆盖 post-copy 与签名结果）。

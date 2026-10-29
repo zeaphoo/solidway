@@ -11,7 +11,7 @@
 #   1. 根 workspace 构建外置 solidway 二进制
 #   2. app/ 独立项目经 tauri-cli 产出 .app
 #   3. post-copy solidway 进 Contents/MacOS/
-#   4. 内层 Mach-O 先签、.app 外层后签
+#   4. 非主程序内层 Mach-O 先签、.app 外层后签（主程序随 bundle 签名）
 #   5. 从已签名的 .app 用 hdiutil 生成 dmg（禁用 --bundles dmg）
 #   6. 挂载 dmg 断言内含 solidway 且签名校验通过
 
@@ -27,7 +27,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
     exit 1
 fi
 
-for command in cargo pnpm codesign hdiutil security node file; do
+for command in cargo pnpm codesign hdiutil security node file plutil; do
     if ! command -v "$command" >/dev/null 2>&1; then
         echo "缺少命令: $command" >&2
         exit 1
@@ -116,10 +116,13 @@ ditto "$APP_SRC" "$APP"
 # 内层 Mach-O 先签，再签 .app 本体（D6；禁 ad-hoc）。
 #
 # 先快照候选再签：签名会改写目录内容（codesign 写临时文件后 rename），
-# 边 find 边签可能在部分 runner 上漏掉后续条目；漏签又会被下面的
-# signed_inner 汇总掩盖，直到外层签名才以 "In subcomponent" 报错。
-# Contents/MacOS 下只应有可执行 Mach-O；这里逐个签、逐个 codesign --verify，
-# 失败立即带原始输出退出（不再用 file 的结果做过滤）。
+# 边 find 边签可能在部分 runner 上漏掉后续条目。
+#
+# 关键顺序：只单独签「非主程序」的内层 Mach-O；CFBundleExecutable 指向的
+# SolidwayApp 留给外层 .app 签名。若直接签这个文件且它尚未签名，codesign
+# 会把它认作所属 bundle 的入口、转去签整个 bundle，并在同级 solidway 未签时
+# 以 "In subcomponent" 失败。arm64 链接器会顺手 ad-hoc 签主程序，所以没暴露；
+# x86_64 Tauri 产物主程序未签，必须按 bundle 入口处理。
 inner_candidates=()
 while IFS= read -r -d '' candidate; do
     inner_candidates+=("$candidate")
@@ -129,9 +132,22 @@ if [[ "${#inner_candidates[@]}" -eq 0 ]]; then
     exit 1
 fi
 
+main_exec="$(plutil -extract CFBundleExecutable raw -o - "$APP/Contents/Info.plist" 2>/dev/null || true)"
+if [[ -z "$main_exec" ]]; then
+    echo "无法从 $APP/Contents/Info.plist 读取 CFBundleExecutable" >&2
+    exit 1
+fi
+
 signed_inner=0
+main_found=0
 for candidate in "${inner_candidates[@]}"; do
-    echo "内层签名：${candidate}（file: $(file -b "$candidate" 2>&1)）"
+    base="${candidate##*/}"
+    echo "内层候选：${candidate}（file: $(file -b "$candidate" 2>&1)）"
+    if [[ "$base" == "$main_exec" ]]; then
+        main_found=1
+        echo "主程序 ${base} 留给外层 .app 签名（不直接签文件）"
+        continue
+    fi
     if ! sign_output="$(codesign --force --options runtime -s "$IDENTITY" "$candidate" 2>&1 </dev/null)"; then
         echo "内层签名失败：$candidate" >&2
         echo "$sign_output" >&2
@@ -148,11 +164,15 @@ for candidate in "${inner_candidates[@]}"; do
     fi
     signed_inner=$((signed_inner + 1))
 done
-if [[ "$signed_inner" -ne "${#inner_candidates[@]}" ]]; then
-    echo "内层签名数量不符：$signed_inner/${#inner_candidates[@]}（不应发生）" >&2
+if [[ "$main_found" -ne 1 ]]; then
+    echo "内层候选里没有 CFBundleExecutable=$main_exec" >&2
     exit 1
 fi
-echo "内层签名并校验通过：$signed_inner/${#inner_candidates[@]} 个文件"
+if [[ "$signed_inner" -ne $(( ${#inner_candidates[@]} - 1 )) ]]; then
+    echo "内层签名数量不符：$signed_inner/$(( ${#inner_candidates[@]} - 1 ))（不应发生）" >&2
+    exit 1
+fi
+echo "内层签名并校验通过：$signed_inner 个文件；主程序 ${main_exec} 由外层 bundle 签名"
 
 if ! sign_output="$(codesign --force --options runtime -s "$IDENTITY" "$APP" 2>&1 </dev/null)"; then
     echo "外层签名失败：$APP" >&2
@@ -165,6 +185,18 @@ if ! sign_output="$(codesign --force --options runtime -s "$IDENTITY" "$APP" 2>&
 fi
 if [[ -n "$sign_output" ]]; then
     echo "$sign_output"
+fi
+main_path="$APP/Contents/MacOS/$main_exec"
+if ! verify_output="$(codesign --verify --strict "$main_path" 2>&1 </dev/null)"; then
+    echo "主程序签名校验失败：$main_path" >&2
+    echo "$verify_output" >&2
+    exit 1
+fi
+main_info="$(codesign -dv --verbose=2 "$main_path" 2>&1)"
+if ! grep -q 'flags=.*runtime' <<<"$main_info"; then
+    echo "主程序缺少 hardened runtime：$main_path" >&2
+    echo "$main_info" >&2
+    exit 1
 fi
 if ! verify_output="$(codesign --verify --deep --strict "$APP" 2>&1 </dev/null)"; then
     echo "签名校验失败：$APP" >&2
