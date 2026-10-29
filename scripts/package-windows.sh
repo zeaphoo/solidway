@@ -170,7 +170,7 @@ shopt -s nullglob
 installers=("$BUNDLE_DIR"/nsis/*.exe "$BUNDLE_DIR"/msi/*.msi)
 shopt -u nullglob
 if [[ ${#installers[@]} -eq 0 ]]; then
-    echo "Tauri bundler 未产出安装包（bundle 目录：$BUNDLE_DIR，bundles=$BUNDLES）" >&2
+    echo "Tauri bundler 未产出安装包（bundle 目录：${BUNDLE_DIR}，bundles=${BUNDLES}）" >&2
     exit 1
 fi
 # 客户端产物统一前缀 solidway-app_（bundler 默认用 productName 命名）。
@@ -191,7 +191,7 @@ done
 # 便携包断言：两个 exe 都必须真的存在（大小写不敏感的文件系统上名字撞车会丢一个）。
 for name in SolidwayApp.exe solidway.exe; do
     if [[ ! -f "$DIST_DIR/portable/$name" ]]; then
-        echo "便携包缺少 $name（检查两个 exe 的文件名是否只差大小写）" >&2
+        echo "便携包缺少 ${name}（检查两个 exe 的文件名是否只差大小写）" >&2
         exit 1
     fi
 done

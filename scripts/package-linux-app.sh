@@ -94,7 +94,7 @@ appimages=("$BUNDLE_DIR"/appimage/*.AppImage)
 shopt -u nullglob
 
 if [[ ${#debs[@]} -eq 0 || ${#appimages[@]} -eq 0 ]]; then
-    echo "Tauri bundler 未产出预期的 deb / AppImage（bundle 目录：$BUNDLE_DIR）" >&2
+    echo "Tauri bundler 未产出预期的 deb / AppImage（bundle 目录：${BUNDLE_DIR}）" >&2
     exit 1
 fi
 

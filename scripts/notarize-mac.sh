@@ -86,7 +86,7 @@ if ! grep -q 'BEGIN PRIVATE KEY' "$KEY_FILE"; then
 fi
 
 if [[ ! -d "$APP" ]]; then
-    fail "缺少已签名 app：$APP（先执行 scripts/package-mac.sh）"
+    fail "缺少已签名 app：${APP}（先执行 scripts/package-mac.sh）"
 fi
 
 version="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*$/\1/p' "$ROOT/app/tauri.conf.json" | head -n1)"
@@ -120,17 +120,17 @@ if [[ -z "$submission_id" ]]; then
     fail "notarytool submit 未返回 submission id"
 fi
 
-echo "等待公证结果（submission=$submission_id，超时预算 $TIMEOUT）…"
+echo "等待公证结果（submission=${submission_id}，超时预算 ${TIMEOUT}）…"
 if ! xcrun notarytool wait "$submission_id" "${notary_args[@]}" --timeout "$TIMEOUT"; then
     xcrun notarytool log "$submission_id" "${notary_args[@]}" || true
-    fail "公证等待失败或超时（submission=$submission_id）"
+    fail "公证等待失败或超时（submission=${submission_id}）"
 fi
 
 info_json="$(xcrun notarytool info "$submission_id" "${notary_args[@]}" --output-format json)"
 status="$(printf '%s\n' "$info_json" | plutil -extract status raw -o - - 2>/dev/null || true)"
 if [[ "$status" != "Accepted" ]]; then
     xcrun notarytool log "$submission_id" "${notary_args[@]}" || true
-    fail "公证未通过：status=${status:-unknown}（submission=$submission_id）"
+    fail "公证未通过：status=${status:-unknown}（submission=${submission_id}）"
 fi
 echo "公证通过：status=$status"
 
