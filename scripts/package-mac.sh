@@ -5,21 +5,21 @@
 # 可用环境变量：
 #   SKIP_WEB_BUILD=1     跳过 pnpm build（要求 web/dist 已存在）
 #   DIST_DIR=...         输出目录，默认 <repo>/dist/mac
-#   MAC_SIGN_IDENTITY=... 签名身份，默认 "AKSL Software"
+#   MAC_SIGN_IDENTITY=... 显式签名身份；未设置时自动探测唯一 Developer ID Application
 #
 # 顺序（不可调换，否则 dmg 会覆盖 post-copy / 签名结果）：
 #   1. 根 workspace 构建外置 solidway 二进制
 #   2. app/ 独立项目经 tauri-cli 产出 .app
 #   3. post-copy solidway 进 Contents/MacOS/
 #   4. 非主程序内层 Mach-O 先签、.app 外层后签（主程序随 bundle 签名）
-#   5. 从已签名的 .app 用 hdiutil 生成 dmg（禁用 --bundles dmg）
-#   6. 挂载 dmg 断言内含 solidway 且签名校验通过
+#   5. 从已签名的 .app 用 dmg-layout.sh 组装布局 dmg（禁用 --bundles dmg）
+#   6. 挂载 dmg 断言内含 solidway、呈现元素与签名校验通过
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${DIST_DIR:-$ROOT/dist/mac}"
-IDENTITY="${MAC_SIGN_IDENTITY:-AKSL Software}"
+IDENTITY="${MAC_SIGN_IDENTITY:-}"
 APP_NAME="Solidway"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -39,6 +39,45 @@ if ! cargo tauri --version >/dev/null 2>&1; then
     exit 1
 fi
 
+# 身份解析（D5）：显式设置优先；未设置时只自动采用唯一的 Developer ID Application，
+# 多/无候选都失败并给出显式设置指引。不内置任何默认身份名。
+resolve_identity() {
+    if [[ -n "${MAC_SIGN_IDENTITY:-}" ]]; then
+        IDENTITY="$MAC_SIGN_IDENTITY"
+        if ! security find-identity -v -p codesigning 2>/dev/null | grep -qF "\"${IDENTITY}\""; then
+            echo "找不到 MAC_SIGN_IDENTITY 指定的代码签名身份：${IDENTITY}" >&2
+            echo "请检查 security find-identity -v -p codesigning 的输出，或导入含完整链的证书。" >&2
+            exit 1
+        fi
+        echo "使用显式签名身份：${IDENTITY}"
+        return 0
+    fi
+
+    local candidate
+    local candidates=()
+    while IFS= read -r candidate; do
+        candidates+=("$candidate")
+    done < <(security find-identity -v -p codesigning 2>/dev/null |
+        sed -n 's/.*"\(Developer ID Application[^"]*\)".*/\1/p')
+
+    if [[ "${#candidates[@]}" -eq 1 ]]; then
+        IDENTITY="${candidates[0]}"
+        echo "自动探测签名身份：${IDENTITY}"
+    elif [[ "${#candidates[@]}" -eq 0 ]]; then
+        echo "未找到有效的 Developer ID Application 签名身份，且未设置 MAC_SIGN_IDENTITY。" >&2
+        echo "请导入 Developer ID Application 证书（含完整链），或显式设置 MAC_SIGN_IDENTITY。" >&2
+        exit 1
+    else
+        echo "找到多个 Developer ID Application 身份，无法自动选择：" >&2
+        for candidate in "${candidates[@]}"; do
+            echo "  - ${candidate}" >&2
+        done
+        echo "请显式设置 MAC_SIGN_IDENTITY 选择其一。" >&2
+        exit 1
+    fi
+}
+resolve_identity
+
 # 版本一致性（D10）：tauri.conf.json 与全部 crates 必须一致。
 conf_version="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*$/\1/p' "$ROOT/app/tauri.conf.json" | head -n1)"
 if [[ -z "$conf_version" ]]; then
@@ -56,12 +95,6 @@ for manifest in \
         exit 1
     fi
 done
-
-# 签名身份必须存在（D6：禁 ad-hoc，不存在即失败）。
-if ! security find-identity -v -p codesigning 2>/dev/null | grep -qF "\"$IDENTITY\""; then
-    echo "找不到代码签名身份：${IDENTITY}（禁 ad-hoc；请先导入含完整链的 p12）" >&2
-    exit 1
-fi
 
 if [[ "${SKIP_WEB_BUILD:-0}" != "1" ]]; then
     if [[ ! -d "$ROOT/web/node_modules" ]]; then
@@ -210,7 +243,8 @@ fi
 
 ARCH="$(uname -m)"
 DMG="$DIST_DIR/solidway-app_${conf_version}_${ARCH}.dmg"
-hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG" >/dev/null
+echo "组装布局 dmg：$DMG"
+"$ROOT/scripts/dmg-layout.sh" "$APP" "$DMG" "$APP_NAME"
 
 # dmg 内容断言（R1）：必须是 post-copy + 签名后的最终态。
 MOUNT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/solidway-dmg.XXXXXX")"
@@ -222,6 +256,18 @@ trap cleanup_dmg EXIT
 hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT_DIR" "$DMG" >/dev/null
 if [[ ! -f "$MOUNT_DIR/$APP_NAME.app/Contents/MacOS/solidway" ]]; then
     echo "dmg 内缺少 $APP_NAME.app/Contents/MacOS/solidway" >&2
+    exit 1
+fi
+if [[ ! -L "$MOUNT_DIR/Applications" ]]; then
+    echo "dmg 内缺少 Applications 符号链接" >&2
+    exit 1
+fi
+if [[ "$(readlink "$MOUNT_DIR/Applications")" != "/Applications" ]]; then
+    echo "dmg 内 Applications 链接目标不是 /Applications" >&2
+    exit 1
+fi
+if [[ ! -f "$MOUNT_DIR/.DS_Store" ]]; then
+    echo "dmg 内缺少 .DS_Store" >&2
     exit 1
 fi
 codesign --verify --deep --strict "$MOUNT_DIR/$APP_NAME.app"

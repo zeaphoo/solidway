@@ -210,7 +210,7 @@ ARCH="$(uname -m)"
 DMG="$DIST_DIR/solidway-app_${version}_${ARCH}.dmg"
 rm -f "$DMG"
 echo "由已钉票 .app 重建 dmg：$DMG"
-hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG" >/dev/null
+"$ROOT/scripts/dmg-layout.sh" "$APP" "$DMG" "$APP_NAME"
 # 重建后的 dmg 有独立校验和，必须单独提交公证后再钉票；
 # 否则 stapler staple 会报 Error 65（CloudKit Record not found）。
 notarize_artifact "$DMG" "dmg"

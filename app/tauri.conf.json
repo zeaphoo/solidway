@@ -25,7 +25,7 @@
     "category": "DeveloperTool",
     "shortDescription": "Local AI gateway desktop app",
     "longDescription": "Solidway desktop app: launches and monitors the local Solidway gateway, then opens its console in the system webview.",
-    "copyright": "Copyright © 2026 AKSL",
+    "copyright": "Copyright © 2026 solidway.xyz",
     "macOS": {
       "minimumSystemVersion": "10.13"
     },

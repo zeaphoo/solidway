@@ -84,3 +84,11 @@ mac 打包闭环（`mac-desktop-packaging`）需要先回答两个未来读者�
 **旧「私钥不上云 / CI 不构建 mac 包」方案为何被取代**（方案 B，2026-10-22）：其两项理由均已失效——①「私钥不上云」在 ADR 0018 已放宽为「p12 进 Secrets」，且 Developer ID 公证的 App Store Connect API key 本就以云端凭据形态使用、天然适合 CI；② mac runner 成本随 tag 触发（非 push 常驻）已可控，且三平台产物统一由 `v*` 标签发布后，本机构建成为发布链上唯一的机器孤点。对外分发需求出现（本事项）使「不公证」的成本收益彻底反转。
 
 **落地**：`app/tauri.conf.json` identifier 迁移 `xyz.solidway` → `xyz.solidway.desktop`（Bundle ID 已注册，命名约定 `xyz.<项目>.<端>`）；`.github/workflows/release.yml` mac job 接入公证；新增 `scripts/notarize-mac.sh`（CI/本机共用，`package-mac.sh` 不动）。详见 `openspec/changes/mac-notarized-packaging/`。
+
+### 2026-10-30 — 本机默认自签身份退役（dmg-presentation 追加裁定）
+
+**裁定**（Charles）：AKSL Software 自签证书及其 CA 已从本机删除后，`scripts/package-mac.sh` 的内置默认身份 `AKSL Software` 一并退役：签名身份默认**自动探测**钥匙串中唯一的 `Developer ID Application` 身份，多候选或零候选即失败并指引显式 `MAC_SIGN_IDENTITY`；显式设置仍优先（含非 Developer ID 身份）。上一修订中「本机自签路径保留为应急」口径随之收敛为「应急 = 显式指定自签身份（如需自签按 `packaging/README.md` 应急段重建）」，不再是默认行为。
+
+**理由**：消除「本地默认身份静默出自签包」隐患——默认路径只允许产出可公证的 Developer ID 签名包，自签产物不再有默认出口。
+
+**落地**：随 `openspec/changes/dmg-presentation/`（同 change 还含 dmg 安装盘布局与 `packaging/README.md` 本机构建节重写）。

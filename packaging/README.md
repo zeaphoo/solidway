@@ -236,15 +236,18 @@ Windows 与 macOS 默认的文件系统**不区分大小写**：`Solidway.exe` �
 ## macOS desktop app
 
 产出 **Developer ID 签名 + Apple 公证**的 `Solidway.app` 与 `solidway-app_<version>_<arch>.dmg`
-（hardened runtime，禁 ad-hoc；`.app` 与 dmg 双钉票，离线首开不依赖在线校验）。mac 侧是
-**纯桌面应用**：随开随用、退出即停，`app/` 启动并托管 `solidway` 子进程；没有 launchd 服务包。
+（hardened runtime，禁 ad-hoc；`.app` 与 dmg 双钉票，离线首开不依赖在线校验）。dmg 为**安装盘**：
+`Solidway.app` 居左、`Applications` 链接居右，窗口固定 660×420；窗口背景使用 Finder 默认呈现
+（macOS 26 起系统忽略 dmg 自定义背景图/纯色，打包链不写背景键）。
+mac 侧是**纯桌面应用**：随开随用、退出即停，`app/` 启动并托管 `solidway` 子进程；没有 launchd 服务包。
 
 ### 构建前置检查项（逐项确认）
 
-- [ ] `cargo` / `pnpm` / `node` / `codesign` / `hdiutil` / `security` / `xcrun` 可用；
+- [ ] `cargo` / `pnpm` / `node` / `python3` / `codesign` / `hdiutil` / `security` / `xcrun` 可用；
 - [ ] `cargo tauri --version` 可用；缺失时执行 `cargo install tauri-cli --locked`；
-- [ ] Keychain 中有 `Developer ID Application` 代码签名身份（`security find-identity -v -p codesigning`），
-      缺失时脚本直接失败（**不提供跳过签名开关、不回退 ad-hoc**）；
+- [ ] Keychain 中有 `Developer ID Application` 代码签名身份（`security find-identity -v -p codesigning`）。
+      未设置 `MAC_SIGN_IDENTITY` 时脚本只接受**唯一**的 `Developer ID Application` 身份；多个/没有候选都会失败
+      并提示显式设置（**不提供跳过签名开关、不回退 ad-hoc/默认自签**）；
 - [ ] 公证凭据已就绪：`MAC_NOTARY_API_KEY_ID` / `MAC_NOTARY_API_ISSUER_ID` /
       `MAC_NOTARY_API_KEY_P8_BASE64`（或 `MAC_NOTARY_API_KEY_P8` 指向已解码的 `.p8` 文件）；
 - [ ] `app/tauri.conf.json` 的 `version` 与 `crates/solidway`、`crates/solidway_api`、
@@ -252,7 +255,10 @@ Windows 与 macOS 默认的文件系统**不区分大小写**：`Solidway.exe` �
 - [ ] `web/dist/index.html` 存在（不设置 `SKIP_WEB_BUILD=1` 时脚本会先构建）。
 
 ```bash
+# 默认自动探测唯一的 Developer ID Application 身份
 ./scripts/package-mac.sh
+# 钥匙串有多个候选时显式指定（名字需与 security find-identity 输出完全一致）：
+MAC_SIGN_IDENTITY="Developer ID Application: <姓名> (<TeamID>)" ./scripts/package-mac.sh
 # 前端已构建时可跳过：SKIP_WEB_BUILD=1 ./scripts/package-mac.sh
 # 公证 + 双钉票 + Gatekeeper 验收（发布必需；本机也可单独执行）：
 ./scripts/notarize-mac.sh
@@ -262,19 +268,24 @@ Windows 与 macOS 默认的文件系统**不区分大小写**：`Solidway.exe` �
 
 ```text
 Solidway.app
-solidway-app_<version>_<arch>.dmg
+solidway-app_<version>_<arch>.dmg   # 安装盘（窗口/图标布局 + Applications 链接）
 ```
 
 打包顺序固定（顺序错会产生不含 `solidway` 或未签名的坏 dmg）：
 `cargo build --release -p solidway` → `cargo tauri build --bundles app` →
 post-copy `solidway` 到 `Contents/MacOS/` → 非主程序内层 Mach-O 先签、`.app` 外层后签（`SolidwayApp` 随 bundle 签） →
-从**已签名**的 `.app` 用 `hdiutil` 生成 dmg → 挂载 dmg 断言内含 `solidway` 且
-`codesign --verify --deep --strict` 通过。**不得**使用 `cargo tauri build --bundles dmg`
+`scripts/dmg-layout.sh` 组装 dmg（staging：`.app` + `/Applications` 链接；在 staging 内生成
+`.DS_Store`，再 `hdiutil` 建 HFS+ UDZO）→ 挂载 dmg 断言 `solidway`、链接、`.DS_Store` 与
+`codesign --verify --deep --strict`。**不得**使用 `cargo tauri build --bundles dmg`
 （bundler 会重建 `.app`，覆盖 post-copy 与签名结果）。
 
 `scripts/notarize-mac.sh` 必须在该链之后执行：把已签名 `.app` 打成 zip 提交公证，通过后先钉票
-`.app`；再由已钉票的 `.app` 重建 dmg，**dmg 有独立校验和，必须单独提交公证**，通过后再钉票
-（覆盖 `dist/mac/` 中未公证的 dmg）。
+`.app`；再由已钉票的 `.app` 经**同一** `scripts/dmg-layout.sh` 重建布局 dmg，
+**dmg 有独立校验和，必须单独提交公证**，通过后再钉票（覆盖 `dist/mac/` 中未公证的 dmg）。
+
+Finder 布局与 `.DS_Store` 由 `scripts/python/gen_dmg_ds_store.py`（vendored `ds_store`/`mac_alias`）生成：
+只写窗口 `bwsp`、图标 `Iloc` 与 `icvp.arrangeBy`，不写背景相关键；不依赖 Finder/AppleScript。
+macOS 26 起 Finder 忽略 dmg 自定义背景（图片与纯色均不渲染），因此交付干净白窗，不再维护背景素材。
 
 ### 安装
 
@@ -302,8 +313,9 @@ hdiutil detach /Volumes/Solidway
 发布产物经 Apple 公证且 `.app` 与 dmg 双钉票：经浏览器下载 / AirDrop 带 quarantine 时
 Gatekeeper 仍可离线验证票据，双击直接打开，不需要手动放行。
 
-本机自签应急路径（只跑 `scripts/package-mac.sh`、不做公证）产出的包**未公证**：
-`spctl` 预期不通过，仅用于本机冒烟与应急，**不得对外分发**。
+`AKSL Software` 本机自签证书已退役；`scripts/package-mac.sh` **没有默认自签身份**，默认只产出
+Developer ID 签名包。若确需临时自签（仅本机冒烟/应急，**不得对外分发**）：自行重建自签身份并导入钥匙串，
+再显式设置 `MAC_SIGN_IDENTITY=<自签身份名>` 后运行；不做公证的包 `spctl` 预期不通过。
 
 ### 冒烟与数据目录
 
