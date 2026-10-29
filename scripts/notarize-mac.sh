@@ -10,7 +10,7 @@
 # 可选环境变量：
 #   DIST_DIR=...        输入/输出目录，默认 <repo>/dist/mac
 #   NOTARY_TIMEOUT=30m  notarytool wait 的超时预算（超时即失败）
-#   STAPLER_RETRY_DELAY=20  stapler validate 网络类失败的重试间隔（秒）
+#   STAPLER_RETRY_DELAY=20  stapler staple/validate 网络类失败的重试间隔（秒）
 #
 # 顺序（不可调换）：
 #   1. 校验 .app 为 Developer ID 签名 + hardened runtime（公证前提）
@@ -39,19 +39,21 @@ fail() {
     exit 1
 }
 
-# stapler validate 可能撞上 CloudKit 瞬时网络错误（如 -1005 connection lost / Error 68）；
-# 仅对网络类失败重试（首次 + 3 次，间隔 STAPLER_RETRY_DELAY 秒）。票据确实缺失（65）立即失败。
+# stapler（staple/validate）会走 CloudKit 联网，可能撞上瞬时网络错误
+# （Error 65/68、NSURLError、connection lost 等）；仅网络类失败重试
+# （首次 + 3 次，间隔 STAPLER_RETRY_DELAY 秒）。非网络态（64/66 等）直接失败。
 stapler_retryable() {
     local rc="$1"
     local output="$2"
-    if [[ "$rc" -eq 68 ]]; then
+    if [[ "$rc" -eq 65 || "$rc" -eq 68 ]]; then
         return 0
     fi
-    grep -qiE 'connection lost|NSURLErrorDomain|-1005|timed out|Error 68' <<<"$output"
+    grep -qiE 'NSURLError|connection lost|-1005|timed out|Error 6[58]|network' <<<"$output"
 }
 
-stapler_validate_retry() {
-    local target="$1"
+stapler_retry() {
+    local action="$1"
+    local target="$2"
     local attempt=1
     local max_attempts=4
     local delay="${STAPLER_RETRY_DELAY:-20}"
@@ -59,21 +61,21 @@ stapler_validate_retry() {
     local rc=0
     while (( attempt <= max_attempts )); do
         rc=0
-        output="$(xcrun stapler validate "$target" 2>&1)" || rc=$?
+        output="$(xcrun stapler "$action" "$target" 2>&1)" || rc=$?
         if (( rc == 0 )); then
             if [[ -n "$output" ]]; then
                 printf '%s\n' "$output"
             fi
             return 0
         fi
-        printf 'stapler validate 失败（第 %d/%d 次，rc=%d）：%s\n' "$attempt" "$max_attempts" "$rc" "$output" >&2
+        printf 'stapler %s 失败（第 %d/%d 次，rc=%d）：%s\n' "$action" "$attempt" "$max_attempts" "$rc" "$output" >&2
         if ! stapler_retryable "$rc" "$output"; then
             return "$rc"
         fi
         if (( attempt == max_attempts )); then
             return "$rc"
         fi
-        printf '网络类失败，%s 秒后重试…\n' "$delay" >&2
+        printf '可重试失败（CloudKit/网络），%s 秒后重试…\n' "$delay" >&2
         sleep "$delay"
         attempt=$((attempt + 1))
     done
@@ -197,8 +199,10 @@ ditto -c -k --keepParent "$APP" "$ZIP"
 notarize_artifact "$ZIP" "app zip"
 
 # 先钉票 .app，再由已钉票 .app 重建 dmg：双钉票，离线首开依赖本地票据。
-xcrun stapler staple "$APP"
-if ! stapler_validate_retry "$APP"; then
+if ! stapler_retry staple "$APP"; then
+    fail "app stapler staple 失败：$APP"
+fi
+if ! stapler_retry validate "$APP"; then
     fail "app stapler validate 失败：$APP"
 fi
 
@@ -210,8 +214,10 @@ hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG" >/
 # 重建后的 dmg 有独立校验和，必须单独提交公证后再钉票；
 # 否则 stapler staple 会报 Error 65（CloudKit Record not found）。
 notarize_artifact "$DMG" "dmg"
-xcrun stapler staple "$DMG"
-if ! stapler_validate_retry "$DMG"; then
+if ! stapler_retry staple "$DMG"; then
+    fail "dmg stapler staple 失败：$DMG"
+fi
+if ! stapler_retry validate "$DMG"; then
     fail "dmg stapler validate 失败：$DMG"
 fi
 
@@ -220,7 +226,7 @@ if [[ ! -f "$MOUNT_DIR/$APP_NAME.app/Contents/MacOS/solidway" ]]; then
     fail "dmg 内缺少 $APP_NAME.app/Contents/MacOS/solidway"
 fi
 codesign --verify --deep --strict "$MOUNT_DIR/$APP_NAME.app"
-if ! stapler_validate_retry "$MOUNT_DIR/$APP_NAME.app"; then
+if ! stapler_retry validate "$MOUNT_DIR/$APP_NAME.app"; then
     fail "dmg 内 .app stapler validate 失败：$MOUNT_DIR/$APP_NAME.app"
 fi
 
