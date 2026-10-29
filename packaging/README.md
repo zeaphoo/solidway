@@ -335,7 +335,8 @@ ls -dt "$HOME/Library/Application Support"/xyz.solidway.desktop.bak-* 2>/dev/nul
 - **公证失败即发布失败**：提交被拒、等待超时、钉票或 `spctl` 验收不通过都使 job 失败，不上传、不降级。
 - 本机 `./scripts/package-mac.sh` 与 CI 走同一签名构建链；`scripts/notarize-mac.sh` 同样可在本机独立执行，
   用于复现或应急公证。
-- 若 GitHub 下线 `macos-13`，把 Intel leg 换成当时的 Intel 镜像（如 `macos-15-intel`）。
+- mac 矩阵：arm64 用 `macos-14`，Intel（x86_64）用 `macos-15-intel`（GitHub 已下线 `macos-13`）；
+  若该镜像未来下线，换当时的 Intel 镜像并同步更新 workflow。
 - Windows 产物在 `windows-latest` 上构建（同为 tag 触发），不做签名、不依赖 secrets；安装包内
   `solidway.exe` 的落点由 `bundle.resources` 保证，首次发布建议实机确认安装目录。
 
