@@ -59,7 +59,7 @@ done
 
 # 签名身份必须存在（D6：禁 ad-hoc，不存在即失败）。
 if ! security find-identity -v -p codesigning 2>/dev/null | grep -qF "\"$IDENTITY\""; then
-    echo "找不到代码签名身份：$IDENTITY（禁 ad-hoc；请先导入含完整链的 p12）" >&2
+    echo "找不到代码签名身份：${IDENTITY}（禁 ad-hoc；请先导入含完整链的 p12）" >&2
     exit 1
 fi
 
@@ -99,7 +99,7 @@ cp -f "$ROOT_TARGET/release/solidway" "$APP_SRC/Contents/MacOS/solidway"
 chmod +x "$APP_SRC/Contents/MacOS/solidway"
 for name in SolidwayApp solidway; do
     if [[ ! -f "$APP_SRC/Contents/MacOS/$name" ]]; then
-        echo "app 包内缺少 Contents/MacOS/$name（检查主程序名是否与 solidway 只差大小写）" >&2
+        echo "app 包内缺少 Contents/MacOS/${name}（检查主程序名是否与 solidway 只差大小写）" >&2
         exit 1
     fi
     if [[ -L "$APP_SRC/Contents/MacOS/$name" ]]; then
@@ -131,7 +131,7 @@ fi
 
 signed_inner=0
 for candidate in "${inner_candidates[@]}"; do
-    echo "内层签名：$candidate（file: $(file -b "$candidate" 2>&1)）"
+    echo "内层签名：${candidate}（file: $(file -b "$candidate" 2>&1)）"
     if ! sign_output="$(codesign --force --options runtime -s "$IDENTITY" "$candidate" 2>&1 </dev/null)"; then
         echo "内层签名失败：$candidate" >&2
         echo "$sign_output" >&2
