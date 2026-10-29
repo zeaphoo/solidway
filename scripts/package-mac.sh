@@ -27,7 +27,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
     exit 1
 fi
 
-for command in cargo pnpm codesign hdiutil security node; do
+for command in cargo pnpm codesign hdiutil security node file; do
     if ! command -v "$command" >/dev/null 2>&1; then
         echo "缺少命令: $command" >&2
         exit 1
@@ -102,6 +102,10 @@ for name in SolidwayApp solidway; do
         echo "app 包内缺少 Contents/MacOS/$name（检查主程序名是否与 solidway 只差大小写）" >&2
         exit 1
     fi
+    if [[ -L "$APP_SRC/Contents/MacOS/$name" ]]; then
+        echo "app 包内 Contents/MacOS/$name 是符号链接；签名循环只处理常规文件，拒绝静默跳过" >&2
+        exit 1
+    fi
 done
 
 rm -rf "$DIST_DIR"
@@ -110,19 +114,67 @@ APP="$DIST_DIR/$APP_NAME.app"
 ditto "$APP_SRC" "$APP"
 
 # 内层 Mach-O 先签，再签 .app 本体（D6；禁 ad-hoc）。
-signed_inner=0
+#
+# 先快照候选再签：签名会改写目录内容（codesign 写临时文件后 rename），
+# 边 find 边签可能在部分 runner 上漏掉后续条目；漏签又会被下面的
+# signed_inner 汇总掩盖，直到外层签名才以 "In subcomponent" 报错。
+# Contents/MacOS 下只应有可执行 Mach-O；这里逐个签、逐个 codesign --verify，
+# 失败立即带原始输出退出（不再用 file 的结果做过滤）。
+inner_candidates=()
 while IFS= read -r -d '' candidate; do
-    if file "$candidate" | grep -q "Mach-O"; then
-        codesign --force --options runtime -s "$IDENTITY" "$candidate"
-        signed_inner=$((signed_inner + 1))
-    fi
-done < <(find "$APP/Contents/MacOS" -type f -print0)
-if [[ "$signed_inner" -eq 0 ]]; then
-    echo "$APP/Contents/MacOS 下没有可签名的 Mach-O" >&2
+    inner_candidates+=("$candidate")
+done < <(find "$APP/Contents/MacOS" -maxdepth 1 -type f -print0)
+if [[ "${#inner_candidates[@]}" -eq 0 ]]; then
+    echo "$APP/Contents/MacOS 下没有文件" >&2
     exit 1
 fi
-codesign --force --options runtime -s "$IDENTITY" "$APP"
-codesign --verify --deep --strict "$APP"
+
+signed_inner=0
+for candidate in "${inner_candidates[@]}"; do
+    echo "内层签名：$candidate（file: $(file -b "$candidate" 2>&1)）"
+    if ! sign_output="$(codesign --force --options runtime -s "$IDENTITY" "$candidate" 2>&1 </dev/null)"; then
+        echo "内层签名失败：$candidate" >&2
+        echo "$sign_output" >&2
+        exit 1
+    fi
+    if [[ -n "$sign_output" ]]; then
+        echo "$sign_output"
+    fi
+    if ! verify_output="$(codesign --verify --strict "$candidate" 2>&1 </dev/null)"; then
+        echo "内层签名校验失败：$candidate" >&2
+        echo "$verify_output" >&2
+        codesign -dv --verbose=2 "$candidate" 2>&1 >&2 || true
+        exit 1
+    fi
+    signed_inner=$((signed_inner + 1))
+done
+if [[ "$signed_inner" -ne "${#inner_candidates[@]}" ]]; then
+    echo "内层签名数量不符：$signed_inner/${#inner_candidates[@]}（不应发生）" >&2
+    exit 1
+fi
+echo "内层签名并校验通过：$signed_inner/${#inner_candidates[@]} 个文件"
+
+if ! sign_output="$(codesign --force --options runtime -s "$IDENTITY" "$APP" 2>&1 </dev/null)"; then
+    echo "外层签名失败：$APP" >&2
+    echo "$sign_output" >&2
+    for candidate in "${inner_candidates[@]}"; do
+        echo "内层签名状态：$candidate" >&2
+        codesign --verify --strict "$candidate" >&2 2>&1 || true
+    done
+    exit 1
+fi
+if [[ -n "$sign_output" ]]; then
+    echo "$sign_output"
+fi
+if ! verify_output="$(codesign --verify --deep --strict "$APP" 2>&1 </dev/null)"; then
+    echo "签名校验失败：$APP" >&2
+    echo "$verify_output" >&2
+    for candidate in "${inner_candidates[@]}"; do
+        echo "内层签名状态：$candidate" >&2
+        codesign -dv --verbose=2 "$candidate" 2>&1 >&2 || true
+    done
+    exit 1
+fi
 
 ARCH="$(uname -m)"
 DMG="$DIST_DIR/solidway-app_${conf_version}_${ARCH}.dmg"
