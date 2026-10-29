@@ -29,9 +29,9 @@
 
 ## 7. 回归与演练
 
-- [ ] 7.1 本机 `scripts/package-mac.sh` 全链回归（自动探测身份路径）+ 挂载断言 + dmg 目检（白窗布局、Applications 链接、拖入安装可用）。验证：目检清单全过
+- [x] 7.1 本机 `scripts/package-mac.sh` 全链回归（自动探测身份路径）+ 挂载断言 + dmg 目检（白窗布局、Applications 链接、拖入安装可用）。验证：目检清单全过（2026-10-30 编排者 macOS 26 实机截图复验：白窗 + 布局 + 标签可读；真实 Developer ID 签名链由 run 40939077699 双臂闭环）
 - [x] 7.2 `openspec validate --strict` 通过；`actionlint` 0 告警（若 workflow 有动；预期 `release.yml` 零改动，确认无动即可）。验证：命令输出符合预期
-- [ ] 7.3 `workflow_dispatch` 演练（`publish=false`）产出已公证布局 dmg。验证：`stapler validate` / `spctl` 验收过；Charles 目检 CI 产物布局与拖入安装可用
+- [x] 7.3 `workflow_dispatch` 演练（`publish=false`）产出已公证布局 dmg。验证：`stapler validate` / `spctl` 验收过；Charles 目检 CI 产物布局与拖入安装可用（run 40939077699：x86_64 / arm64 双臂全绿，公证/钉票/挂载验收通过）
 
 ## 8. 决策留痕（随提案已落地）
 

@@ -51,6 +51,10 @@ tmp/
 master.key
 config.toml
 
+# Python 字节码（vendored dmg 布局库的运行副产物）
+__pycache__/
+*.pyc
+
 # 系统与编辑器
 .DS_Store
 .idea/
