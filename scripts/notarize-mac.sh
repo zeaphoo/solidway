@@ -15,8 +15,9 @@
 #   1. 校验 .app 为 Developer ID 签名 + hardened runtime（公证前提）
 #   2. zip 提交 notarytool，按 submission id 等待通过（超时即失败）
 #   3. 钉票 .app 并 stapler validate
-#   4. 由已钉票 .app 重建 dmg，钉票 dmg
-#   5. 挂载断言 dmg 内含 solidway；dmg 本体只做 stapler validate，对挂载内 .app 做 spctl 验收
+#   4. 由已钉票 .app 重建 dmg（dmg 有独立校验和，不能复用 .app 的公证票据）
+#   5. dmg 单独提交 notarytool，等待 Accepted；失败即带 notarytool log 退出
+#   6. 钉票 dmg 并 stapler validate；挂载断言 + spctl 验收挂载内 .app
 
 # 注意：GNU bash 3.2 在 set -u 展开错误时若存在 EXIT trap，可能以 0 退出
 # （trap 内 $? 已为 0）。因此 release.yml 另设独立 "Verify notarized dmg"
@@ -113,31 +114,45 @@ echo "$signature_info" | grep -E 'Authority=|flags='
 
 notary_args=(--key "$KEY_FILE" --key-id "$MAC_NOTARY_API_KEY_ID" --issuer "$MAC_NOTARY_API_ISSUER_ID")
 
+# 提交一个待公证产物（app zip 或 dmg）并等待 Accepted；失败带 notarytool log 后退出。
+notarize_artifact() {
+    local artifact="$1"
+    local label="$2"
+    local submit_json submission_id info_json status
+
+    echo "提交${label}公证…"
+    if ! submit_json="$(xcrun notarytool submit "$artifact" "${notary_args[@]}" --output-format json)"; then
+        fail "公证提交失败：${label}（${artifact}）"
+    fi
+    submission_id="$(printf '%s\n' "$submit_json" | plutil -extract id raw -o - - 2>/dev/null || true)"
+    if [[ -z "$submission_id" ]]; then
+        echo "$submit_json" >&2
+        fail "notarytool submit 未返回 submission id（${label}）"
+    fi
+
+    echo "等待公证结果（submission=${submission_id}，超时预算 ${TIMEOUT}）…"
+    if ! xcrun notarytool wait "$submission_id" "${notary_args[@]}" --timeout "$TIMEOUT"; then
+        xcrun notarytool log "$submission_id" "${notary_args[@]}" || true
+        fail "公证等待失败或超时（submission=${submission_id}，${label}）"
+    fi
+
+    if ! info_json="$(xcrun notarytool info "$submission_id" "${notary_args[@]}" --output-format json)"; then
+        xcrun notarytool log "$submission_id" "${notary_args[@]}" || true
+        fail "公证状态查询失败（submission=${submission_id}，${label}）"
+    fi
+    status="$(printf '%s\n' "$info_json" | plutil -extract status raw -o - - 2>/dev/null || true)"
+    if [[ "$status" != "Accepted" ]]; then
+        xcrun notarytool log "$submission_id" "${notary_args[@]}" || true
+        fail "公证未通过：status=${status:-unknown}（submission=${submission_id}，${label}）"
+    fi
+    echo "公证通过：${label} status=${status}"
+}
+
 ZIP="$WORK_DIR/$APP_NAME.zip"
 echo "打包公证提交物：$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
 
-echo "提交公证…"
-submit_json="$(xcrun notarytool submit "$ZIP" "${notary_args[@]}" --output-format json)"
-submission_id="$(printf '%s\n' "$submit_json" | plutil -extract id raw -o - - 2>/dev/null || true)"
-if [[ -z "$submission_id" ]]; then
-    echo "$submit_json" >&2
-    fail "notarytool submit 未返回 submission id"
-fi
-
-echo "等待公证结果（submission=${submission_id}，超时预算 ${TIMEOUT}）…"
-if ! xcrun notarytool wait "$submission_id" "${notary_args[@]}" --timeout "$TIMEOUT"; then
-    xcrun notarytool log "$submission_id" "${notary_args[@]}" || true
-    fail "公证等待失败或超时（submission=${submission_id}）"
-fi
-
-info_json="$(xcrun notarytool info "$submission_id" "${notary_args[@]}" --output-format json)"
-status="$(printf '%s\n' "$info_json" | plutil -extract status raw -o - - 2>/dev/null || true)"
-if [[ "$status" != "Accepted" ]]; then
-    xcrun notarytool log "$submission_id" "${notary_args[@]}" || true
-    fail "公证未通过：status=${status:-unknown}（submission=${submission_id}）"
-fi
-echo "公证通过：status=$status"
+notarize_artifact "$ZIP" "app zip"
 
 # 先钉票 .app，再由已钉票 .app 重建 dmg：双钉票，离线首开依赖本地票据。
 xcrun stapler staple "$APP"
@@ -148,6 +163,9 @@ DMG="$DIST_DIR/solidway-app_${version}_${ARCH}.dmg"
 rm -f "$DMG"
 echo "由已钉票 .app 重建 dmg：$DMG"
 hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG" >/dev/null
+# 重建后的 dmg 有独立校验和，必须单独提交公证后再钉票；
+# 否则 stapler staple 会报 Error 65（CloudKit Record not found）。
+notarize_artifact "$DMG" "dmg"
 xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG"
 

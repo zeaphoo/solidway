@@ -119,13 +119,17 @@ macOS 产物 MUST 按 runner 原生架构分别构建（x86_64 与 arm64 各一�
 
 ### Requirement: macOS 公证与钉票
 
-macOS 发布物 MUST 经 Apple 公证（notarization）后才可上传：构建任务 MUST 将签名后的 `.app`（zip 形态）提交 `notarytool` 并等待公证通过；通过后 MUST 先对 `.app` 钉票（stapling），再由已钉票的 `.app` 重建 dmg 并对 dmg 钉票，使 `.app` 与 dmg 均携带公证票据（离线首开不依赖 Apple 在线校验）。
+macOS 发布物 MUST 经 Apple 公证（notarization）后才可上传：构建任务 MUST 将签名后的 `.app`（zip 形态）提交 `notarytool` 并等待公证通过；通过后 MUST 先对 `.app` 钉票（stapling），再由已钉票的 `.app` 重建 dmg，MUST 将重建后的 dmg 单独提交 `notarytool` 并等待通过，通过后 MUST 对 dmg 钉票，使 `.app` 与 dmg 均携带公证票据（离线首开不依赖 Apple 在线校验）。dmg 有独立校验和，MUST NOT 复用 `.app` 的公证结果直接钉票。
 
 公证提交、钉票与 dmg 重建 MUST 由可独立执行的脚本提供（`scripts/notarize-mac.sh`），CI 与本机共用同一脚本；`scripts/package-mac.sh` 的本机构建链 MUST 保持不变（自签应急路径不受影响）。
 
 #### Scenario: 公证通过后双钉票
 - **WHEN** `.app` 公证通过
-- **THEN** `.app` 先钉票，dmg 由已钉票的 `.app` 重建后再钉票，二者均含公证票据
+- **THEN** `.app` 先钉票；dmg 由已钉票的 `.app` 重建后单独提交公证，通过后再钉票，二者均含公证票据
+
+#### Scenario: dmg 公证失败
+- **WHEN** 重建后的 dmg 提交公证被拒或等待超时
+- **THEN** 任务失败，dmg 不钉票、不上传
 
 #### Scenario: 脚本独立可执行
 - **WHEN** 在本机 `scripts/package-mac.sh` 产出的已签名 `dist/mac` 产物上执行 `scripts/notarize-mac.sh`

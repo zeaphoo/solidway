@@ -273,7 +273,8 @@ post-copy `solidway` 到 `Contents/MacOS/` → 非主程序内层 Mach-O 先签�
 （bundler 会重建 `.app`，覆盖 post-copy 与签名结果）。
 
 `scripts/notarize-mac.sh` 必须在该链之后执行：把已签名 `.app` 打成 zip 提交公证，通过后先钉票
-`.app`，再由已钉票的 `.app` 重建 dmg 并钉票（覆盖 `dist/mac/` 中未公证的 dmg）。
+`.app`；再由已钉票的 `.app` 重建 dmg，**dmg 有独立校验和，必须单独提交公证**，通过后再钉票
+（覆盖 `dist/mac/` 中未公证的 dmg）。
 
 ### 安装
 
