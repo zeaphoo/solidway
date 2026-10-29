@@ -65,3 +65,22 @@ mac 打包闭环（`mac-desktop-packaging`）需要先回答两个未来读者�
 **仍未改变**：不做 Apple 公证，`spctl` 预期不通过；quarantine 放行说明仍在 `packaging/README.md`。
 
 **恢复路径**（负责人决定后）：CI 改为 **tag 触发**（避免每次 push 构建），配置 `MAC_CERT_P12_BASE64` / `MAC_CERT_PASSWORD`（p12 含 `AKSL Software` 及其 CA 完整链），恢复「临时 keychain 导入 → `scripts/package-mac.sh` → `codesign --verify --deep --strict` 自检 → 只上传 `.dmg`」；本机脚本无需改动。
+
+### 2026-10-29 — Developer ID 签名 + Apple 公证（取代「自签不公证」）
+
+**裁定**（Charles 拍板，`mac-notarized-packaging`）：**取代决策 2 的「AKSL 自签」与决策 3 的「不做公证」**——对外分发时机已到（决策 3 预留的「另立事项」即本事项）：
+
+1. **签名身份改为 `Developer ID Application`**（G2 Sub-CA，2031 到期；Apple 开发者**个人账号**，Charles 名下）。hardened runtime（`codesign --options runtime`）与禁 ad-hoc 口径不变。
+2. **发布物必须经 Apple 公证并钉票**：提交 `.app`（zip）→ `notarytool` 等待通过 → 钉票 `.app` → 由已钉票 `.app` 重建 dmg → 钉票 dmg（`.app` 与 dmg 双带公证票据，离线首开不依赖在线校验）；`spctl -a -vv` 验收 `accepted source=Notarized Developer ID`，公证未过 = 发布失败（不跳过、不降级为仅签名）。
+3. **p12 与公证凭证进 GitHub Secrets**：沿用 ADR 0018 的 tag 触发 + secrets 路径。签名 `MAC_CERT_P12_BASE64` / `MAC_CERT_PASSWORD` / `MAC_SIGN_IDENTITY`（改必填，个人身份名含姓名不可硬编码默认值）；公证用 App Store Connect API key：`MAC_NOTARY_API_KEY_ID` / `MAC_NOTARY_API_ISSUER_ID` / `MAC_NOTARY_API_KEY_P8_BASE64`。真实凭据永不入仓库与 workflow 明文。
+4. **取消自签回落**：secrets 缺失即明确失败并输出配置指引；本机 `scripts/package-mac.sh` 自签路径保留为应急（CI 不打通）。
+
+**被否方案**：
+
+- **保留自签回落（secrets 缺失时降级）**：未公证产物在 quarantine 下体验劣且违背「公证失败 = 发布失败」口径；配置缺失应显式失败而非静默降级。
+- **公证只提交 dmg、只钉 dmg**：dmg 内 `.app` 无票，首开依赖 Apple 在线校验；`.app`/dmg 双钉票成本仅一次 hdiutil，换取离线直开。
+- **公证凭据用 Apple ID + App 专用密码**：配置更少，但绑定个人账号（口令面更大、与 2FA 环境耦合）；API key 可独立轮换、与人解耦、便于未来迁移组织账号。
+
+**旧「私钥不上云 / CI 不构建 mac 包」方案为何被取代**（方案 B，2026-10-22）：其两项理由均已失效——①「私钥不上云」在 ADR 0018 已放宽为「p12 进 Secrets」，且 Developer ID 公证的 App Store Connect API key 本就以云端凭据形态使用、天然适合 CI；② mac runner 成本随 tag 触发（非 push 常驻）已可控，且三平台产物统一由 `v*` 标签发布后，本机构建成为发布链上唯一的机器孤点。对外分发需求出现（本事项）使「不公证」的成本收益彻底反转。
+
+**落地**：`app/tauri.conf.json` identifier 迁移 `xyz.solidway` → `xyz.solidway.desktop`（Bundle ID 已注册，命名约定 `xyz.<项目>.<端>`）；`.github/workflows/release.yml` mac job 接入公证；新增 `scripts/notarize-mac.sh`（CI/本机共用，`package-mac.sh` 不动）。详见 `openspec/changes/mac-notarized-packaging/`。

@@ -81,10 +81,11 @@ Tauri 外壳：在本机托管网关、用 webview 打开控制台，支持开�
 ```bash
 ./scripts/package-linux-app.sh     # deb + AppImage
 ./scripts/package-windows.sh       # NSIS/MSI + 便携 zip
-./scripts/package-mac.sh           # .app + .dmg（自签）
+./scripts/package-mac.sh           # .app + .dmg（签名）
+./scripts/notarize-mac.sh          # 公证 + 双钉票（发布用，需 API 凭据）
 ```
 
-每个安装包都把网关二进制放在应用可执行文件同目录，单装即可运行。macOS 为自签、未公证；Windows 未签名——首次运行会遇到 Gatekeeper / SmartScreen 提示。
+每个安装包都把网关二进制放在应用可执行文件同目录，单装即可运行。macOS 发布产物为 Developer ID 签名 + Apple 公证（无 Gatekeeper 拦截）；Windows 未签名——首次运行会遇到 SmartScreen 提示。
 
 ## 数据目录
 
@@ -92,9 +93,9 @@ Tauri 外壳：在本机托管网关、用 webview 打开控制台，支持开�
 
 | 平台 | 路径 |
 |---|---|
-| Linux | `~/.local/share/xyz.solidway` |
-| macOS | `~/Library/Application Support/xyz.solidway` |
-| Windows | `%APPDATA%\xyz.solidway` |
+| Linux | `~/.local/share/xyz.solidway.desktop` |
+| macOS | `~/Library/Application Support/xyz.solidway.desktop` |
+| Windows | `%APPDATA%\xyz.solidway.desktop` |
 | Linux 安装包 | `/var/lib/solidway` |
 
 | 文件 | 内容 |

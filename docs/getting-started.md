@@ -81,10 +81,11 @@ Build with:
 ```bash
 ./scripts/package-linux-app.sh     # deb + AppImage
 ./scripts/package-windows.sh       # NSIS/MSI + portable zip
-./scripts/package-mac.sh           # .app + .dmg (self-signed)
+./scripts/package-mac.sh           # .app + .dmg (signed)
+./scripts/notarize-mac.sh          # notarize + staple .app/.dmg (release; needs API key)
 ```
 
-Each package ships the gateway binary next to the application executable, so a single install is enough. The macOS build is self-signed and not notarized; Windows builds are unsigned — expect Gatekeeper/SmartScreen prompts on first launch.
+Each package ships the gateway binary next to the application executable, so a single install is enough. macOS release builds are signed with Developer ID and notarized (no Gatekeeper prompt); Windows builds are unsigned — expect SmartScreen prompts on first launch.
 
 ## Data directory
 
@@ -92,9 +93,9 @@ Each package ships the gateway binary next to the application executable, so a s
 
 | Platform | Path |
 |---|---|
-| Linux | `~/.local/share/xyz.solidway` |
-| macOS | `~/Library/Application Support/xyz.solidway` |
-| Windows | `%APPDATA%\xyz.solidway` |
+| Linux | `~/.local/share/xyz.solidway.desktop` |
+| macOS | `~/Library/Application Support/xyz.solidway.desktop` |
+| Windows | `%APPDATA%\xyz.solidway.desktop` |
 | Linux package | `/var/lib/solidway` |
 
 | File | Contents |

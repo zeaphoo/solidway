@@ -9,7 +9,7 @@
 | Linux 服务 | `solidway_<ver>-1_<arch>.deb`、`solidway-<ver>-1.<arch>.rpm`（systemd） | `scripts/package-linux.sh` |
 | Linux 客户端 | `solidway-app_<ver>_<arch>.deb`、`solidway-app_<ver>_<arch>.AppImage`（均自带网关） | `scripts/package-linux-app.sh` |
 | Windows 客户端 | `solidway-app_<ver>_x64-setup.exe`（NSIS，中英双语）、`solidway-app_<ver>_x64_<locale>.msi`、`solidway-app_<ver>_x64_portable.zip` | `scripts/package-windows.sh` |
-| macOS 客户端 | `solidway-app_<ver>_<arch>.dmg`（x86_64 / arm64 各一份） | `scripts/package-mac.sh` |
+| macOS 客户端 | `solidway-app_<ver>_<arch>.dmg`（x86_64 / arm64 各一份，已公证） | `scripts/package-mac.sh` + `scripts/notarize-mac.sh` |
 
 命名约定：**客户端产物统一 `solidway-app_<ver>_<arch>[.<ext>]`**，服务包统一 `solidway_<ver>-<rev>_<arch>`；
 架构名按平台惯例（Linux `amd64`/`arm64`、Windows `x64`、macOS `x86_64`/`arm64`）。
@@ -26,18 +26,24 @@ git tag v0.1.0 && git push origin v0.1.0
 版本一致性由 `scripts/check-release-version.sh` 在构建前强制校验（`app/tauri.conf.json`
 与全部 crates / app 的 `Cargo.toml`，且 tag 必须等于 `v<version>`）。
 
-macOS 构建需要仓库 secrets（缺失即失败，不产出未签名包）：
+macOS 发布产物需要 **Developer ID 签名 + Apple 公证**，仓库 secrets 共 6 项（缺失即失败，不产出未签名/未公证包）：
 
 | secret | 说明 |
 |---|---|
-| `MAC_CERT_P12_BASE64` | `AKSL Software` 及其 CA 完整链的 p12（base64） |
+| `MAC_CERT_P12_BASE64` | `Developer ID Application` 证书及其完整链的 p12（base64） |
 | `MAC_CERT_PASSWORD` | p12 口令 |
-| `MAC_SIGN_IDENTITY`（可选） | 默认 `AKSL Software` |
+| `MAC_SIGN_IDENTITY`（必填） | 签名身份全名，如 `Developer ID Application: <姓名> (<TeamID>)` |
+| `MAC_NOTARY_API_KEY_ID` | App Store Connect API key id |
+| `MAC_NOTARY_API_ISSUER_ID` | App Store Connect issuer id |
+| `MAC_NOTARY_API_KEY_P8_BASE64` | API key 的 `.p8` 私钥（base64） |
+
+公证以 App Store Connect API key 认证（`notarytool --key … --key-id … --issuer-id …`），
+`.p8` 只在运行时落到临时文件、用后即删；真实凭据永不入仓库。
 
 只想演练而不发 Release：手动触发 `Release` 工作流，`publish=false`（可选 `with_mac=false`
 跳过 macOS，若尚未配置 secrets）。
 
-`app/tauri.conf.json` 的 `identifier` 为 `xyz.solidway`（域名 `solidway.xyz` 的反向 DNS）。发布前没有历史用户，因此**不做数据目录迁移**：老开发者本机的 `com.solidway.app` 目录需要手工改名或删除。
+`app/tauri.conf.json` 的 `identifier` 为 `xyz.solidway.desktop`（域名 `solidway.xyz` 的反向 DNS，命名约定 `xyz.<项目>.<端>`）。发布前没有历史用户，因此**不做数据目录迁移**：老开发者本机由旧 identifier 派生的目录（如 `~/Library/Application Support/xyz.solidway`、`%APPDATA%\xyz.solidway`）需要手工改名或删除。
 
 **Linux 客户端依赖服务包**：客户端不内嵌 `solidway`，按 PATH 使用 `deb`/`rpm` 安装的
 `/usr/bin/solidway`。因此安装顺序是「先服务包、后客户端」（见下文「与 Tauri 桌面应用的关系」）。
@@ -225,20 +231,22 @@ Windows 与 macOS 默认的文件系统**不区分大小写**：`Solidway.exe` �
   选择「更多信息 → 仍要运行」；企业环境可用 GPO/信任策略放行。
 - 需要 **WebView2 运行时**：Windows 10 1803+ 通常随 Edge 已安装；缺失时安装包会
   引导安装（Tauri 的 bootstrapper），便携版需用户自行安装。
-- 数据目录为 `%APPDATA%\xyz.solidway`；Windows 上该目录不得位于共享目录（主密钥依赖目录 ACL）。
+- 数据目录为 `%APPDATA%\xyz.solidway.desktop`；Windows 上该目录不得位于共享目录（主密钥依赖目录 ACL）。
 
 ## macOS desktop app
 
-产出**自签名**的 `Solidway.app` 与 `solidway-app_<version>_<arch>.dmg`（AKSL Software +
-hardened runtime，禁 ad-hoc；不做 Apple 公证）。mac 侧是**纯桌面应用**：随开随用、
-退出即停，`app/` 启动并托管 `solidway` 子进程；没有 launchd 服务包。
+产出 **Developer ID 签名 + Apple 公证**的 `Solidway.app` 与 `solidway-app_<version>_<arch>.dmg`
+（hardened runtime，禁 ad-hoc；`.app` 与 dmg 双钉票，离线首开不依赖在线校验）。mac 侧是
+**纯桌面应用**：随开随用、退出即停，`app/` 启动并托管 `solidway` 子进程；没有 launchd 服务包。
 
 ### 构建前置检查项（逐项确认）
 
-- [ ] `cargo` / `pnpm` / `node` / `codesign` / `hdiutil` / `security` 可用；
+- [ ] `cargo` / `pnpm` / `node` / `codesign` / `hdiutil` / `security` / `xcrun` 可用；
 - [ ] `cargo tauri --version` 可用；缺失时执行 `cargo install tauri-cli --locked`；
-- [ ] Keychain 中有 `AKSL Software` 代码签名身份（`security find-identity -v -p codesigning`），
+- [ ] Keychain 中有 `Developer ID Application` 代码签名身份（`security find-identity -v -p codesigning`），
       缺失时脚本直接失败（**不提供跳过签名开关、不回退 ad-hoc**）；
+- [ ] 公证凭据已就绪：`MAC_NOTARY_API_KEY_ID` / `MAC_NOTARY_API_ISSUER_ID` /
+      `MAC_NOTARY_API_KEY_P8_BASE64`（或 `MAC_NOTARY_API_KEY_P8` 指向已解码的 `.p8` 文件）；
 - [ ] `app/tauri.conf.json` 的 `version` 与 `crates/solidway`、`crates/solidway_api`、
       `crates/solidway_core`、`app` 的版本一致（脚本会校验，不一致即失败）；
 - [ ] `web/dist/index.html` 存在（不设置 `SKIP_WEB_BUILD=1` 时脚本会先构建）。
@@ -246,6 +254,8 @@ hardened runtime，禁 ad-hoc；不做 Apple 公证）。mac 侧是**纯桌面�
 ```bash
 ./scripts/package-mac.sh
 # 前端已构建时可跳过：SKIP_WEB_BUILD=1 ./scripts/package-mac.sh
+# 公证 + 双钉票 + Gatekeeper 验收（发布必需；本机也可单独执行）：
+./scripts/notarize-mac.sh
 ```
 
 默认输出到 `dist/mac/`：
@@ -262,6 +272,9 @@ post-copy `solidway` 到 `Contents/MacOS/` → 内层 Mach-O 先签、`.app` 外
 `codesign --verify --deep --strict` 通过。**不得**使用 `cargo tauri build --bundles dmg`
 （bundler 会重建 `.app`，覆盖 post-copy 与签名结果）。
 
+`scripts/notarize-mac.sh` 必须在该链之后执行：把已签名 `.app` 打成 zip 提交公证，通过后先钉票
+`.app`，再由已钉票的 `.app` 重建 dmg 并钉票（覆盖 `dist/mac/` 中未公证的 dmg）。
+
 ### 安装
 
 ```bash
@@ -269,34 +282,32 @@ ditto dist/mac/Solidway.app /Applications/Solidway.app
 open /Applications/Solidway.app
 ```
 
-签名自检（构建机）：
+签名与公证自检（构建机）：
 
 ```bash
 codesign --verify --deep --strict dist/mac/Solidway.app
-codesign -dv --verbose=2 dist/mac/Solidway.app   # Authority=AKSL Software、flags 含 runtime
+codesign -dv --verbose=2 dist/mac/Solidway.app   # Authority=Developer ID Application、flags 含 runtime
+xcrun stapler validate dist/mac/Solidway.app
+xcrun stapler validate dist/mac/solidway-app_<version>_<arch>.dmg
+spctl -a -vv -t open --context context:primary-signature dist/mac/solidway-app_<version>_<arch>.dmg
+# 期望输出含 accepted source=Notarized Developer ID
 ```
 
 ### Gatekeeper / quarantine 说明
 
-未做 Apple 公证，`spctl -a -vv dist/mac/Solidway.app` **预期不通过**（`source=Unnotarized Developer ID`
-或类似），这是已接受的下限，不是构建失败。
+发布产物经 Apple 公证且 `.app` 与 dmg 双钉票：经浏览器下载 / AirDrop 带 quarantine 时
+Gatekeeper 仍可离线验证票据，双击直接打开，不需要手动放行。
 
-经浏览器下载 / AirDrop 的 dmg 会带 quarantine：
-
-- 首选：访达右键 `Solidway.app` →「打开」→ 在对话框再确认「打开」；
-- `xattr` 兜底（确认来源可信后）：
-
-```bash
-xattr -dr com.apple.quarantine /Applications/Solidway.app
-```
+本机自签应急路径（只跑 `scripts/package-mac.sh`、不做公证）产出的包**未公证**：
+`spctl` 预期不通过，仅用于本机冒烟与应急，**不得对外分发**。
 
 ### 冒烟与数据目录
 
-`data_root` 固定为 `~/Library/Application Support/xyz.solidway`（不读配置文件、
+`data_root` 固定为 `~/Library/Application Support/xyz.solidway.desktop`（不读配置文件、
 不支持应用专属环境变量覆盖）。冒烟会写真实数据目录，按下面程序隔离：
 
 ```bash
-DATA="$HOME/Library/Application Support/xyz.solidway"
+DATA="$HOME/Library/Application Support/xyz.solidway.desktop"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 [ -d "$DATA" ] && mv "$DATA" "$DATA.bak-$STAMP"   # 备份真实数据
 # 启动 app → 状态转「运行中」→ 控制台可达（端口以 solidway: listening addr= 为准，缺省 6565）
@@ -311,17 +322,19 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 - **备份堆积**：`bak-<时间戳>` 只保留**最近 2 份**，更早的在确认最新备份可恢复后手工删除：
 
 ```bash
-ls -dt "$HOME/Library/Application Support"/xyz.solidway.bak-* 2>/dev/null | tail -n +3
+ls -dt "$HOME/Library/Application Support"/xyz.solidway.desktop.bak-* 2>/dev/null | tail -n +3
 # 确认上面列出的都是可删旧备份后：| xargs rm -rf
 ```
 
 ### CI 与分发边界
 
 - **CI 只在 `v*` 标签上构建 mac 产物**（ADR 0018）：签名身份经 secrets 导入临时 keychain，
-  构建后 `codesign --verify --deep --strict` 自检，只上传 `.dmg`；分支 push 不构建 mac 包。
-- secrets 缺失时 job 直接失败，**不提供跳过签名开关、不回退 ad-hoc**（防止未签名产物流出）。
-- 本机 `./scripts/package-mac.sh` 与 CI 走同一脚本，本地出包口径完全一致；`dist/mac/` 产物
-  可自行分发。
+  构建后 `codesign --verify --deep --strict` 自检，随后 `scripts/notarize-mac.sh` 完成公证、
+  双钉票与 `spctl` 验收；只有已公证并通过验收的 `.dmg` 才上传。分支 push 不构建 mac 包。
+- secrets 缺失时 job 直接失败，**不提供跳过签名/公证开关、不回退 ad-hoc 或自签**（防止未签名/未公证产物流出）。
+- **公证失败即发布失败**：提交被拒、等待超时、钉票或 `spctl` 验收不通过都使 job 失败，不上传、不降级。
+- 本机 `./scripts/package-mac.sh` 与 CI 走同一签名构建链；`scripts/notarize-mac.sh` 同样可在本机独立执行，
+  用于复现或应急公证。
 - 若 GitHub 下线 `macos-13`，把 Intel leg 换成当时的 Intel 镜像（如 `macos-15-intel`）。
 - Windows 产物在 `windows-latest` 上构建（同为 tag 触发），不做签名、不依赖 secrets；安装包内
   `solidway.exe` 的落点由 `bundle.resources` 保证，首次发布建议实机确认安装目录。
