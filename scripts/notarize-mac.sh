@@ -10,6 +10,7 @@
 # 可选环境变量：
 #   DIST_DIR=...        输入/输出目录，默认 <repo>/dist/mac
 #   NOTARY_TIMEOUT=30m  notarytool wait 的超时预算（超时即失败）
+#   STAPLER_RETRY_DELAY=20  stapler validate 网络类失败的重试间隔（秒）
 #
 # 顺序（不可调换）：
 #   1. 校验 .app 为 Developer ID 签名 + hardened runtime（公证前提）
@@ -36,6 +37,47 @@ ACCEPTED_SOURCE="source=Notarized Developer ID"
 fail() {
     echo "$*" >&2
     exit 1
+}
+
+# stapler validate 可能撞上 CloudKit 瞬时网络错误（如 -1005 connection lost / Error 68）；
+# 仅对网络类失败重试（首次 + 3 次，间隔 STAPLER_RETRY_DELAY 秒）。票据确实缺失（65）立即失败。
+stapler_retryable() {
+    local rc="$1"
+    local output="$2"
+    if [[ "$rc" -eq 68 ]]; then
+        return 0
+    fi
+    grep -qiE 'connection lost|NSURLErrorDomain|-1005|timed out|Error 68' <<<"$output"
+}
+
+stapler_validate_retry() {
+    local target="$1"
+    local attempt=1
+    local max_attempts=4
+    local delay="${STAPLER_RETRY_DELAY:-20}"
+    local output=""
+    local rc=0
+    while (( attempt <= max_attempts )); do
+        rc=0
+        output="$(xcrun stapler validate "$target" 2>&1)" || rc=$?
+        if (( rc == 0 )); then
+            if [[ -n "$output" ]]; then
+                printf '%s\n' "$output"
+            fi
+            return 0
+        fi
+        printf 'stapler validate 失败（第 %d/%d 次，rc=%d）：%s\n' "$attempt" "$max_attempts" "$rc" "$output" >&2
+        if ! stapler_retryable "$rc" "$output"; then
+            return "$rc"
+        fi
+        if (( attempt == max_attempts )); then
+            return "$rc"
+        fi
+        printf '网络类失败，%s 秒后重试…\n' "$delay" >&2
+        sleep "$delay"
+        attempt=$((attempt + 1))
+    done
+    return "$rc"
 }
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -156,7 +198,9 @@ notarize_artifact "$ZIP" "app zip"
 
 # 先钉票 .app，再由已钉票 .app 重建 dmg：双钉票，离线首开依赖本地票据。
 xcrun stapler staple "$APP"
-xcrun stapler validate "$APP"
+if ! stapler_validate_retry "$APP"; then
+    fail "app stapler validate 失败：$APP"
+fi
 
 ARCH="$(uname -m)"
 DMG="$DIST_DIR/solidway-app_${version}_${ARCH}.dmg"
@@ -167,14 +211,18 @@ hdiutil create -volname "$APP_NAME" -srcfolder "$APP" -ov -format UDZO "$DMG" >/
 # 否则 stapler staple 会报 Error 65（CloudKit Record not found）。
 notarize_artifact "$DMG" "dmg"
 xcrun stapler staple "$DMG"
-xcrun stapler validate "$DMG"
+if ! stapler_validate_retry "$DMG"; then
+    fail "dmg stapler validate 失败：$DMG"
+fi
 
 hdiutil attach -nobrowse -readonly -mountpoint "$MOUNT_DIR" "$DMG" >/dev/null
 if [[ ! -f "$MOUNT_DIR/$APP_NAME.app/Contents/MacOS/solidway" ]]; then
     fail "dmg 内缺少 $APP_NAME.app/Contents/MacOS/solidway"
 fi
 codesign --verify --deep --strict "$MOUNT_DIR/$APP_NAME.app"
-xcrun stapler validate "$MOUNT_DIR/$APP_NAME.app"
+if ! stapler_validate_retry "$MOUNT_DIR/$APP_NAME.app"; then
+    fail "dmg 内 .app stapler validate 失败：$MOUNT_DIR/$APP_NAME.app"
+fi
 
 # spctl 验收：dmg 本体没有 Mach-O 签名可评（会报 no usable signature），
 # 只验收挂载后的 dmg 内 .app。
