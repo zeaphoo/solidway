@@ -16,7 +16,11 @@
 #   2. zip 提交 notarytool，按 submission id 等待通过（超时即失败）
 #   3. 钉票 .app 并 stapler validate
 #   4. 由已钉票 .app 重建 dmg，钉票 dmg
-#   5. 挂载断言 dmg 内含 solidway，spctl 验收 accepted source=Notarized Developer ID
+#   5. 挂载断言 dmg 内含 solidway；dmg 本体只做 stapler validate，对挂载内 .app 做 spctl 验收
+
+# 注意：GNU bash 3.2 在 set -u 展开错误时若存在 EXIT trap，可能以 0 退出
+# （trap 内 $? 已为 0）。因此 release.yml 另设独立 "Verify notarized dmg"
+# 闸门，不依赖本脚本的退出语义；本脚本只负责公证、钉票与自查。
 
 set -euo pipefail
 
@@ -25,7 +29,8 @@ DIST_DIR="${DIST_DIR:-$ROOT/dist/mac}"
 APP_NAME="Solidway"
 APP="$DIST_DIR/$APP_NAME.app"
 TIMEOUT="${NOTARY_TIMEOUT:-30m}"
-ACCEPTED_MARKER="accepted source=Notarized Developer ID"
+ACCEPTED_STATUS="accepted"
+ACCEPTED_SOURCE="source=Notarized Developer ID"
 
 fail() {
     echo "$*" >&2
@@ -153,35 +158,20 @@ fi
 codesign --verify --deep --strict "$MOUNT_DIR/$APP_NAME.app"
 xcrun stapler validate "$MOUNT_DIR/$APP_NAME.app"
 
-# spctl 验收：最终 dmg（按平台差异尝试 open/install 形态）+ 挂载内 .app。
+# spctl 验收：dmg 本体没有 Mach-O 签名可评（会报 no usable signature），
+# 只验收挂载后的 dmg 内 .app。
 accepted() {
-    grep -qF "$ACCEPTED_MARKER" <<<"$1"
+    # spctl 输出为多行：`<path>: accepted` 与 `source=Notarized Developer ID` 分行，
+    # 不能按连续字符串匹配。
+    grep -qF "$ACCEPTED_STATUS" <<<"$1" && grep -qF "$ACCEPTED_SOURCE" <<<"$1"
 }
-
-dmg_output=""
-for args in "-a -vv" "-a -vv -t install" "-a -vv -t open --context context:primary-signature"; do
-    # shellcheck disable=SC2086 # 需要按空格拆分 spctl 参数
-    candidate="$(spctl $args "$DMG" 2>&1 || true)"
-    if accepted "$candidate"; then
-        dmg_output="$candidate"
-        break
-    fi
-    if [[ -n "$candidate" ]]; then
-        dmg_output="$candidate"
-    fi
-done
-if ! accepted "$dmg_output"; then
-    echo "$dmg_output" >&2
-    fail "spctl 验收失败：dmg 输出不含 \"$ACCEPTED_MARKER\""
-fi
-echo "$dmg_output" | grep -F "$ACCEPTED_MARKER"
 
 app_output="$(spctl -a -vv "$MOUNT_DIR/$APP_NAME.app" 2>&1 || true)"
 if ! accepted "$app_output"; then
     echo "$app_output" >&2
-    fail "spctl 验收失败：挂载内 .app 输出不含 \"$ACCEPTED_MARKER\""
+    fail "spctl 验收失败：dmg 内 .app 输出不含 accepted / source=Notarized Developer ID"
 fi
-echo "$app_output" | grep -F "$ACCEPTED_MARKER"
+printf '%s\n' "$app_output" | grep -F "$ACCEPTED_SOURCE"
 
 hdiutil detach "$MOUNT_DIR" >/dev/null
 rmdir "$MOUNT_DIR" 2>/dev/null || true

@@ -289,8 +289,11 @@ codesign --verify --deep --strict dist/mac/Solidway.app
 codesign -dv --verbose=2 dist/mac/Solidway.app   # Authority=Developer ID Application、flags 含 runtime
 xcrun stapler validate dist/mac/Solidway.app
 xcrun stapler validate dist/mac/solidway-app_<version>_<arch>.dmg
-spctl -a -vv -t open --context context:primary-signature dist/mac/solidway-app_<version>_<arch>.dmg
-# 期望输出含 accepted source=Notarized Developer ID
+# dmg 本体不做 spctl 评估（无 Mach-O 签名可评）；挂载后验收内部 .app：
+hdiutil attach -nobrowse -readonly dist/mac/solidway-app_<version>_<arch>.dmg
+spctl -a -vv /Volumes/Solidway/Solidway.app
+hdiutil detach /Volumes/Solidway
+# 期望 spctl 输出分行含 accepted 与 source=Notarized Developer ID
 ```
 
 ### Gatekeeper / quarantine 说明

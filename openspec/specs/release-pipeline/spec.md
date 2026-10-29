@@ -163,16 +163,16 @@ macOS 发布物 MUST 经 Apple 公证（notarization）后才可上传：构建�
 
 ### Requirement: Gatekeeper 验收闸门
 
-mac 产物上传前 MUST 以 `spctl -a -vv` 验证最终 dmg，输出 MUST 含 `accepted source=Notarized Developer ID`；验证不通过任务 MUST 失败。演练（`workflow_dispatch`，`publish=false`）产出的 dmg MUST 满足同一验收标准。
+mac 产物上传前 MUST 对最终 dmg 执行 `xcrun stapler validate`，并 MUST 挂载该 dmg 后对其内 `.app` 执行 `spctl -a -vv`；`stapler validate` MUST 通过，`spctl` 输出 MUST 含 `accepted` 与 `source=Notarized Developer ID`。任一验证不通过任务 MUST 失败。dmg 本体 MUST NOT 作为 `spctl` 的评估对象（dmg 无 Mach-O 签名可评，会报 `no usable signature`）。演练（`workflow_dispatch`，`publish=false`）产出的 dmg MUST 满足同一验收标准。
 
-#### Scenario: spctl 验收通过
-- **WHEN** 对最终 dmg 执行 `spctl -a -vv`
-- **THEN** 输出含 `accepted source=Notarized Developer ID`，产物继续上传
+#### Scenario: 验收通过
+- **WHEN** 对最终 dmg 执行 `xcrun stapler validate`，并挂载后对 dmg 内 `.app` 执行 `spctl -a -vv`
+- **THEN** `stapler validate` 通过，`spctl` 输出含 `accepted` 与 `source=Notarized Developer ID`，产物继续上传
 
-#### Scenario: spctl 验收拒绝
-- **WHEN** `spctl` 输出不含 `accepted source=Notarized Developer ID`
+#### Scenario: 验收拒绝
+- **WHEN** dmg 缺少公证票据，或 dmg 内 `.app` 的 `spctl` 输出不含 `accepted` / `source=Notarized Developer ID`
 - **THEN** 任务失败，dmg 不上传
 
 #### Scenario: 演练产物同标准
 - **WHEN** 维护者以 `workflow_dispatch`（`publish=false`）演练
-- **THEN** 产出的 dmg 已公证并通过 `spctl` 验收
+- **THEN** 产出的 dmg 已钉票，且其内 `.app` 通过 `spctl` 验收

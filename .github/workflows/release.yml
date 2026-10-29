@@ -233,6 +233,53 @@ jobs:
           umask 077
           printf '%s' "$MAC_NOTARY_API_KEY_P8_BASE64" | base64 --decode > "$MAC_NOTARY_API_KEY_P8"
           ./scripts/notarize-mac.sh
+      # 独立兜底闸门：不依赖 notarize-mac.sh 的退出语义（bash 3.2 的 EXIT trap
+      # 会把 unbound variable 的退出码吞成 0）。上传前重新验收最终 dmg：
+      # dmg 本体只做 stapler validate；spctl 验收挂载后的 dmg 内 .app。
+      - name: Verify notarized dmg
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dmgs=(dist/mac/*.dmg)
+          if (( ${#dmgs[@]} != 1 )); then
+            echo "::error::期望恰好 1 个 dmg，实际 ${#dmgs[@]} 个"
+            exit 1
+          fi
+          dmg="${dmgs[0]}"
+          echo "验收 dmg: $dmg"
+          if ! xcrun stapler validate "$dmg"; then
+            echo "::error::dmg 未钉票（stapler validate 失败）"
+            exit 1
+          fi
+
+          mount_dir="$(mktemp -d "${TMPDIR:-/tmp}/solidway-dmg-verify.XXXXXX")"
+          cleanup() {
+            hdiutil detach "$mount_dir" >/dev/null 2>&1 || true
+            rmdir "$mount_dir" 2>/dev/null || true
+          }
+          fail() {
+            echo "::error::$*" >&2
+            cleanup
+            exit 1
+          }
+          if ! hdiutil attach -nobrowse -readonly -mountpoint "$mount_dir" "$dmg" >/dev/null; then
+            fail "挂载 dmg 失败"
+          fi
+          apps=("$mount_dir"/*.app)
+          if (( ${#apps[@]} != 1 )); then
+            fail "dmg 内应有且仅有 1 个 .app，实际 ${#apps[@]} 个"
+          fi
+          app="${apps[0]}"
+          echo "验收 dmg 内 .app: $app"
+          if ! codesign --verify --deep --strict "$app"; then
+            fail "dmg 内 .app 签名校验失败"
+          fi
+          app_output="$(spctl -a -vv "$app" 2>&1 || true)"
+          printf '%s\n' "$app_output"
+          if ! grep -q 'accepted' <<<"$app_output" || ! grep -q 'source=Notarized Developer ID' <<<"$app_output"; then
+            fail "dmg 内 .app 未通过 Gatekeeper 验收（缺少 accepted / source=Notarized Developer ID）"
+          fi
+          cleanup
       - name: Remove notary API key
         if: always()
         run: rm -f "$RUNNER_TEMP/notary-key.p8"
