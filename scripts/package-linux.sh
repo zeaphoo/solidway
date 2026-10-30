@@ -44,8 +44,15 @@ cargo build --release -p solidway
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
+# RPM 的 Version 字段不允许 `-`（它是 Version/Release 分隔符），而 semver 预发布必须带 `-`：
+# 把 `-` 映射成 `~`（0.5.0-rc1 → 0.5.0~rc1），与 cargo-deb 对 deb 版本的写法一致，
+# 排序仍低于正式版。稳定版版本号本身不含 `-`，映射后原样不变。
+version="$(./scripts/check-release-version.sh)"
+rpm_version="${version/-/\~}"
+
 cargo deb -p solidway --no-build --no-dbgsym --output "$DIST_DIR"
-cargo generate-rpm -p crates/solidway --output "$DIST_DIR"
+cargo generate-rpm -p crates/solidway --output "$DIST_DIR" \
+    --set-metadata "version = \"$rpm_version\""
 
 echo
 echo "生成完成："

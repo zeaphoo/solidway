@@ -14,6 +14,10 @@
 命名约定：**客户端产物统一 `solidway-app_<ver>_<arch>[.<ext>]`**，服务包统一 `solidway_<ver>-<rev>_<arch>`；
 架构名按平台惯例（Linux `amd64`/`arm64`、Windows `x64`、macOS `x86_64`/`arm64`）。
 
+**预发布版本写法**：清单里的 semver 必须带连字符（如 `0.5.0-rc1`，Cargo/Tauri 拒绝 `0.5.0rc1`），
+而 deb / rpm 的版本字段用 `~` 表达预发布（`solidway_0.5.0~rc1-1_amd64.deb`、`solidway-0.5.0~rc1-1.x86_64.rpm`），
+排序仍低于同号正式版：`cargo-deb` 自动转换，rpm 由 `scripts/package-linux.sh` 显式映射（RPM 的 `Version` 不允许 `-`）。
+
 流程：
 
 ```bash
