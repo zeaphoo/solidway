@@ -97,10 +97,20 @@ solidway-<version>-1.<arch>.rpm
 脚本会先构建 `web/dist`，再执行 `cargo build --release -p solidway`。
 二进制动态链接 glibc，因此构建机版本决定了产物的 **glibc 下限**。
 
-发布流水线的 Linux job 固定使用 `runs-on: ubuntu-24.04`（glibc 2.39），**不使用 `ubuntu-latest`**：
-`-latest` 会随 GitHub 迁移到 Ubuntu 26 而抬升 glibc 下限，导致旧发行版用户装不上。
-要兼容更老的发行版，就显式把该 runner 换成目标基线（注意 Tauri v2 需要 `libwebkit2gtk-4.1-dev`，
-过于老旧的镜像可能没有该包）。
+发布流水线固定构建机（全部三平台，均不使用 `-latest`）：
+
+| 平台 | runner | 说明 |
+|---|---|---|
+| Linux | `ubuntu-22.04` | glibc **2.35**（24.04 为 2.39，22.04 兼容更老的发行版） |
+| Windows | `windows-2022` | 固定 MSVC / WiX / NSIS 工具链 |
+| macOS arm64 | `macos-14` | 产物经 `minimumSystemVersion` = 10.13 约束 |
+| macOS x86_64 | `macos-15-intel` | GitHub 已下线 `macos-13`，Intel leg 只能用该镜像 |
+
+`-latest` 会随 GitHub 迁移基础镜像（如 2026-10-19 起 Ubuntu 26）而在无意中抬升二进制依赖下限/改变工具链，
+且发生在「重新打同一个 tag」时不可控。CI 的测试矩阵同样固定为 `ubuntu-22.04` / `macos-14` / `windows-2022`。
+
+`ubuntu-22.04` 的 `universe` 源已提供 Tauri v2 所需的 `libwebkit2gtk-4.1-dev`（jammy-updates 为 2.50.x），
+桌面客户端可正常构建；若要再降基线，需确认目标镜像有该包（22.04 之前没有 4.1 ABI）。
 
 如果前端已构建，可跳过：
 
@@ -370,9 +380,9 @@ ls -dt "$HOME/Library/Application Support"/xyz.solidway.desktop.bak-* 2>/dev/nul
 - **公证失败即发布失败**：提交被拒、等待超时、钉票或 `spctl` 验收不通过都使 job 失败，不上传、不降级。
 - 本机 `./scripts/package-mac.sh` 与 CI 走同一签名构建链；`scripts/notarize-mac.sh` 同样可在本机独立执行，
   用于复现或应急公证。
-- mac 矩阵：arm64 用 `macos-14`，Intel（x86_64）用 `macos-15-intel`（GitHub 已下线 `macos-13`）；
-  若该镜像未来下线，换当时的 Intel 镜像并同步更新 workflow。
-- Windows 产物在 `windows-latest` 上构建（同为 tag 触发），不做签名、不依赖 secrets；安装包内
+- mac 矩阵（固定镜像，不用 `macos-latest`）：arm64 用 `macos-14`，Intel（x86_64）用 `macos-15-intel`
+  （GitHub 已下线 `macos-13`）；若该镜像未来下线，换当时的 Intel 镜像并同步更新 workflow 与本表。
+- Windows 产物在固定的 `windows-2022` 上构建（同为 tag 触发），不做签名、不依赖 secrets；安装包内
   `solidway.exe` 的落点由 `bundle.resources` 保证，首次发布建议实机确认安装目录。
 
 ### 与 Linux service 包的关系

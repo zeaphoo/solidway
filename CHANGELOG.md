@@ -11,7 +11,7 @@
 ### Changed
 
 - **产物命名带操作系统标记**：`solidway[-app]_<ver>_<os>_<arch>[.<ext>]`（`<os>` = `linux` / `windows` / `macos`），服务包为 `solidway_<ver>-<rev>_<os>_<arch>`，例如 `solidway_0.5.0~rc.1-1_linux_amd64.deb`、`solidway-app_0.5.0-rc.1_macos_arm64.dmg`、`solidway-app_0.5.0-rc.1_windows_x64_portable.zip`，便于在 Release 资产列表里辨认平台。
-- **固定 Linux 构建机**：发布与 CI 的 Ubuntu job 由 `ubuntu-latest` 改为 `ubuntu-24.04`，避免 `-latest` 随基础镜像升级而抬高产物的 glibc 下限。
+- **固定构建机**：发布与 CI 的 Ubuntu job 改为 `ubuntu-22.04`（glibc 2.35，比 24.04 的 2.39 兼容更老的发行版）、Windows job 改为 `windows-2022`、macOS 测试矩阵改为 `macos-14`（发布侧本已固定 `macos-14` / `macos-15-intel`）；三平台均不再使用 `-latest`，避免基础镜像迁移被动抬高依赖下限或改变工具链。
 
 ### Fixed
 

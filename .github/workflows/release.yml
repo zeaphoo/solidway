@@ -35,7 +35,7 @@ env:
 jobs:
   verify:
     name: verify tag & versions
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -64,7 +64,7 @@ jobs:
   linux-service:
     name: linux service packages (deb/rpm)
     needs: verify
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -94,7 +94,7 @@ jobs:
   linux-app:
     name: linux desktop client (deb/AppImage)
     needs: verify
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -340,7 +340,7 @@ jobs:
   windows-app:
     name: windows client (nsis/msi + portable)
     needs: verify
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -380,7 +380,7 @@ jobs:
       && needs.linux-app.result == 'success'
       && needs.windows-app.result == 'success'
       && (needs.mac.result == 'success' || needs.mac.result == 'skipped')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - name: Require tag for manual publish
