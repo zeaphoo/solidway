@@ -1,6 +1,6 @@
 [package]
 name = "solidway-app"
-version = "0.5.0-rc.1"
+version = "0.5.0-rc.2"
 edition = "2021"
 license = "AGPL-3.0-only"
 description = "Solidway 桌面壳：启动并监控 solidway，在 webview 中打开其控制台"

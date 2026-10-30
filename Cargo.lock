@@ -2430,7 +2430,7 @@ dependencies = [
 
 [[package]]
 name = "solidway"
-version = "0.5.0-rc.1"
+version = "0.5.0-rc.2"
 dependencies = [
  "axum",
  "solidway-api",
@@ -2441,7 +2441,7 @@ dependencies = [
 
 [[package]]
 name = "solidway-api"
-version = "0.5.0-rc.1"
+version = "0.5.0-rc.2"
 dependencies = [
  "aes-gcm",
  "arc-swap",
@@ -2483,7 +2483,7 @@ dependencies = [
 
 [[package]]
 name = "solidway-core"
-version = "0.5.0-rc.1"
+version = "0.5.0-rc.2"
 dependencies = [
  "axum",
  "brotli-decompressor",
@@ -2504,7 +2504,7 @@ dependencies = [
 
 [[package]]
 name = "solidway-egress"
-version = "0.5.0-rc.1"
+version = "0.5.0-rc.2"
 dependencies = [
  "serde_json",
  "solidway-transcode",
@@ -2513,7 +2513,7 @@ dependencies = [
 
 [[package]]
 name = "solidway-transcode"
-version = "0.5.0-rc.1"
+version = "0.5.0-rc.2"
 dependencies = [
  "serde",
  "serde_json",

@@ -8,14 +8,16 @@
 
 ## [Unreleased]
 
+## [0.5.0-rc.2] - 2026-10-30
+
 ### Changed
 
-- **产物命名带操作系统标记**：`solidway[-app]_<ver>_<os>_<arch>[.<ext>]`（`<os>` = `linux` / `windows` / `macos`），服务包为 `solidway_<ver>-<rev>_<os>_<arch>`，例如 `solidway_0.5.0~rc.1-1_linux_amd64.deb`、`solidway-app_0.5.0-rc.1_macos_arm64.dmg`、`solidway-app_0.5.0-rc.1_windows_x64_portable.zip`，便于在 Release 资产列表里辨认平台。
+- **产物命名带操作系统标记**：`solidway[-app]_<ver>_<os>_<arch>[.<ext>]`（`<os>` = `linux` / `windows` / `macos`），服务包为 `solidway_<ver>-<rev>_<os>_<arch>`，例如 `solidway_0.5.0~rc.2-1_linux_amd64.deb`、`solidway-app_0.5.0-rc.2_macos_arm64.dmg`、`solidway-app_0.5.0-rc.2_windows_x64_portable.zip`，便于在 Release 资产列表里辨认平台。
 - **固定构建机**：发布与 CI 的 Ubuntu job 改为 `ubuntu-22.04`（glibc 2.35，比 24.04 的 2.39 兼容更老的发行版）、Windows job 改为 `windows-2022`、macOS arm64（发布 + CI）改为 `macos-15`（`macos-14` 镜像已 deprecated）、Intel leg 保持 `macos-15-intel`；三平台均不再使用 `-latest`，避免基础镜像迁移被动抬高依赖下限或改变工具链。
 
 ### Fixed
 
-- **Linux 22.04 构建失败**：`rust-cache` 默认只按 `runner.os` 分桶，把 24.04（glibc 2.39）上编译的 `aws-lc-sys` 目标文件复用到 22.04（glibc 2.35）上，链接时报 `undefined symbol: __isoc23_sscanf` / `__isoc23_strtol`；现所有缓存步骤的 `key` 带上 runner 镜像标签（`ubuntu-22.04` / `macos-14` / `macos-15-intel` / `windows-2022`）。
+- **Linux 22.04 构建失败**：`rust-cache` 默认只按 `runner.os` 分桶，把 24.04（glibc 2.39）上编译的 `aws-lc-sys` 目标文件复用到 22.04（glibc 2.35）上，链接时报 `undefined symbol: __isoc23_sscanf` / `__isoc23_strtol`；现所有缓存步骤的 `key` 带上 runner 镜像标签（`ubuntu-22.04` / `macos-15` / `macos-15-intel` / `windows-2022`）。
 - **发布资产**：Windows 便携版的 `solidway.exe` / `SolidwayApp.exe` 不再作为独立 Release 资产上传（发布物只有便携 zip，避免重复下载与体积误解）；发布收集步骤跳过 `*/portable/*`。
 
 ## [0.5.0-rc.1] - 2026-10-30
@@ -44,5 +46,6 @@
 - **Windows MSI**：WiX 的 `ProductVersion` 只接受数字，非数字预发布标识符（`rc.1`）会让 msi 打包失败；现由 `scripts/package-windows.sh` 把预发布里的数字映射到 build 段（`0.5.0-rc.1` → `0.5.0.1`），产物文件名仍为 `0.5.0-rc.1`。
 - **macOS 分发**：dmg 安装盘布局（Applications 链接与图标定位）、Developer ID 签名 + Apple 公证双钉票、Gatekeeper 验收。
 
-[Unreleased]: https://github.com/zeaphoo/solidway/compare/v0.5.0-rc.1...HEAD
+[Unreleased]: https://github.com/zeaphoo/solidway/compare/v0.5.0-rc.2...HEAD
+[0.5.0-rc.2]: https://github.com/zeaphoo/solidway/releases/tag/v0.5.0-rc.2
 [0.5.0-rc.1]: https://github.com/zeaphoo/solidway/releases/tag/v0.5.0-rc.1

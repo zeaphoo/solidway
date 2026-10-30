@@ -15,11 +15,11 @@
 `<os>` 取 `linux` / `windows` / `macos`，架构名按平台惯例（Linux `amd64`/`arm64`、Windows `x64`、macOS `x86_64`/`arm64`）。
 OS 标记是为了在 Release 资产列表里一眼辨认平台（下载页只有文件名可看）。
 
-**预发布版本写法**：清单里的 semver 必须带连字符（如 `0.5.0-rc.1`，Cargo/Tauri 拒绝 `0.5.0rc1`），
+**预发布版本写法**：清单里的 semver 必须带连字符（如 `0.5.0-rc.2`，Cargo/Tauri 拒绝 `0.5.0rc1`），
 而 deb / rpm 的版本字段用 `~` 表达预发布（`solidway_0.5.0~rc.1-1_linux_amd64.deb`、`solidway-0.5.0~rc.1-1.linux.x86_64.rpm`），
 排序仍低于同号正式版：`cargo-deb` 自动转换，rpm 由 `scripts/package-linux.sh` 显式映射（RPM 的 `Version` 不允许 `-`）。
 **Windows MSI** 的 `ProductVersion` 同样只接受数字（`major.minor.patch[.build]`），`scripts/package-windows.sh`
-把预发布里的第一个数字映射到 build 段（`0.5.0-rc.1` → `0.5.0.1`），文件名与 NSIS / dmg / deb / rpm 仍是 `0.5.0-rc.1`。
+把预发布里的第一个数字映射到 build 段（`0.5.0-rc.2` → `0.5.0.1`），文件名与 NSIS / dmg / deb / rpm 仍是 `0.5.0-rc.2`。
 
 便携版只以 zip 形式发布：zip 内的 `SolidwayApp.exe` / `solidway.exe` 不单独作为 Release 资产上传。
 
@@ -27,12 +27,12 @@ OS 标记是为了在 Release 资产列表里一眼辨认平台（下载页只�
 
 ```bash
 # 1) 清单版本一致（脚本会校验，否则 tag 构建直接失败）
-./scripts/check-release-version.sh          # 应输出当前版本，如 0.5.0-rc.1
+./scripts/check-release-version.sh          # 应输出当前版本，如 0.5.0-rc.2
 # 2) 写 CHANGELOG：把 [Unreleased] 的内容落到 `## [<version>] - <date>` 段
 #    （缺该段时 verify 阶段直接失败，不会进入构建）
-./scripts/release-notes.sh 0.5.0-rc.1      # 预览将作为 Release 正文的内容
+./scripts/release-notes.sh 0.5.0-rc.2      # 预览将作为 Release 正文的内容
 # 3) 打 tag 并推送（tag 必须等于 v<version>）
-git tag v0.5.0-rc.1 && git push origin v0.5.0-rc.1
+git tag v0.5.0-rc.2 && git push origin v0.5.0-rc.2
 ```
 
 Release 正文来自 `CHANGELOG.md` 的对应版本段（`scripts/release-notes.sh` 抽取），不再使用 GitHub
