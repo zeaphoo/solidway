@@ -20,6 +20,8 @@
 **Windows MSI** 的 `ProductVersion` 同样只接受数字（`major.minor.patch[.build]`），`scripts/package-windows.sh`
 把预发布里的第一个数字映射到 build 段（`0.5.0-rc.1` → `0.5.0.1`），文件名与 NSIS / dmg / deb / rpm 仍是 `0.5.0-rc.1`。
 
+便携版只以 zip 形式发布：zip 内的 `SolidwayApp.exe` / `solidway.exe` 不单独作为 Release 资产上传。
+
 流程：
 
 ```bash

@@ -398,7 +398,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          find dist -type f \
+          # `*/portable/*` 是便携 zip 的展开物（zip 本身已是发布物），不再单独挂到 Release。
+          find dist -path '*/portable/*' -prune -o -type f \
             \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' \
                -o -name '*.exe' -o -name '*.msi' -o -name '*.zip' \) \
             -exec cp -v {} release/ \;

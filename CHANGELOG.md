@@ -8,6 +8,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **发布资产**：Windows 便携版的 `solidway.exe` / `SolidwayApp.exe` 不再作为独立 Release 资产上传（发布物只有便携 zip，避免重复下载与体积误解）；发布收集步骤跳过 `*/portable/*`。
+
 ## [0.5.0-rc.1] - 2026-10-30
 
 首个公开预发布版本。
