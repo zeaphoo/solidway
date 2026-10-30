@@ -14,18 +14,24 @@
 命名约定：**客户端产物统一 `solidway-app_<ver>_<arch>[.<ext>]`**，服务包统一 `solidway_<ver>-<rev>_<arch>`；
 架构名按平台惯例（Linux `amd64`/`arm64`、Windows `x64`、macOS `x86_64`/`arm64`）。
 
-**预发布版本写法**：清单里的 semver 必须带连字符（如 `0.5.0-rc1`，Cargo/Tauri 拒绝 `0.5.0rc1`），
-而 deb / rpm 的版本字段用 `~` 表达预发布（`solidway_0.5.0~rc1-1_amd64.deb`、`solidway-0.5.0~rc1-1.x86_64.rpm`），
+**预发布版本写法**：清单里的 semver 必须带连字符（如 `0.5.0-rc.1`，Cargo/Tauri 拒绝 `0.5.0rc1`），
+而 deb / rpm 的版本字段用 `~` 表达预发布（`solidway_0.5.0~rc.1-1_amd64.deb`、`solidway-0.5.0~rc.1-1.x86_64.rpm`），
 排序仍低于同号正式版：`cargo-deb` 自动转换，rpm 由 `scripts/package-linux.sh` 显式映射（RPM 的 `Version` 不允许 `-`）。
 
 流程：
 
 ```bash
-# 1) 版本号在三处保持一致（脚本会校验，否则 tag 构建直接失败）
-./scripts/check-release-version.sh          # 应输出当前版本，如 0.1.0
-# 2) 打 tag 并推送（tag 必须等于 v<version>）
-git tag v0.1.0 && git push origin v0.1.0
+# 1) 清单版本一致（脚本会校验，否则 tag 构建直接失败）
+./scripts/check-release-version.sh          # 应输出当前版本，如 0.5.0-rc.1
+# 2) 写 CHANGELOG：把 [Unreleased] 的内容落到 `## [<version>] - <date>` 段
+#    （缺该段时 verify 阶段直接失败，不会进入构建）
+./scripts/release-notes.sh 0.5.0-rc.1      # 预览将作为 Release 正文的内容
+# 3) 打 tag 并推送（tag 必须等于 v<version>）
+git tag v0.5.0-rc.1 && git push origin v0.5.0-rc.1
 ```
+
+Release 正文来自 `CHANGELOG.md` 的对应版本段（`scripts/release-notes.sh` 抽取），不再使用 GitHub
+自动生成的提交汇总。
 
 版本一致性由 `scripts/check-release-version.sh` 在构建前强制校验（`app/tauri.conf.json`
 与全部 crates / app 的 `Cargo.toml`，且 tag 必须等于 `v<version>`）。

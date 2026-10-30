@@ -97,7 +97,7 @@ Solidway 位于你的应用与模型供应商之间：请求体、响应体与�
 
 | | |
 |---|---|
-| 版本 | `0.5.0-rc1`，1.0 之前，minor 版本之间接口可能变化 |
+| 版本 | `0.5.0-rc.1`，1.0 之前，minor 版本之间接口可能变化 |
 | 源码 | 完整实现即在本仓库 |
 | 平台 | Linux（服务 + 桌面）、macOS（桌面）、Windows（桌面） |
 | 许可证 | AGPL-3.0-only |
@@ -113,5 +113,6 @@ AGPL-3.0-only。可以自由运行、修改、自托管。若你把**修改版**
 
 - [快速开始](docs/getting-started.zh.md) —— 构建、运行、部署、桌面安装包、数据目录与备份
 - [架构说明](docs/architecture.zh.md) —— 进程布局、crate 划分、数据模型
+- [变更日志](CHANGELOG.md) —— 每个版本的用户可见变更
 - [参与贡献](CONTRIBUTING.zh.md) —— 开发流程与必须通过的检查
 - [设计决策](docs/adr/)、[领域术语](docs/domain-context.md)、[行为规格](openspec/specs/)

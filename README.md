@@ -97,7 +97,7 @@ Sources: Bifrost and LiteLLM project documentation, reviewed October 2026. Produ
 
 | | |
 |---|---|
-| Version | `0.5.0-rc1`, pre-1.0 — interfaces may change between minor releases |
+| Version | `0.5.0-rc.1`, pre-1.0 — interfaces may change between minor releases |
 | Source | Complete implementation in this repository |
 | Platforms | Linux (server + desktop), macOS (desktop), Windows (desktop) |
 | License | AGPL-3.0-only |
@@ -113,5 +113,6 @@ Running Solidway internally, or as a service to your own employees, carries no s
 
 - [Getting started](docs/getting-started.md) — build, run, deploy, desktop packages, data directory and backups
 - [Architecture](docs/architecture.md) — process layout, crates, data model
+- [Changelog](CHANGELOG.md) — user-visible changes per release
 - [Contributing](CONTRIBUTING.md) — development workflow and required checks
 - [Design decisions](docs/adr/), [domain glossary](docs/domain-context.md), [behaviour specs](openspec/specs/)
