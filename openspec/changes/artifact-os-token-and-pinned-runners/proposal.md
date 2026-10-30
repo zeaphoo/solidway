@@ -33,6 +33,6 @@
 ## Impact
 
 - 脚本：`scripts/package-linux.sh`、`scripts/package-linux-app.sh`、`scripts/package-mac.sh`、`scripts/package-windows.sh`（产物重命名）。
-- CI：`.github/workflows/release.yml`、`.github/workflows/ci.yml`（`ubuntu-22.04` / `windows-2022` / `macos-14`，全部固定）。
+- CI：`.github/workflows/release.yml`、`.github/workflows/ci.yml`（`ubuntu-22.04` / `windows-2022` / `macos-15`，全部固定）。
 - 文档：`packaging/README.md`、`CHANGELOG.md`。
 - 兼容性：已发布的 `v0.5.0-rc.1` 资产名保持旧格式（不改写历史发布）；新命名从下一个版本生效。

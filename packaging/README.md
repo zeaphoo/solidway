@@ -103,11 +103,11 @@ solidway-<version>-1.<arch>.rpm
 |---|---|---|
 | Linux | `ubuntu-22.04` | glibc **2.35**（24.04 为 2.39，22.04 兼容更老的发行版） |
 | Windows | `windows-2022` | 固定 MSVC / WiX / NSIS 工具链 |
-| macOS arm64 | `macos-14` | 产物经 `minimumSystemVersion` = 10.13 约束 |
+| macOS arm64 | `macos-15` | 产物经 `minimumSystemVersion` = 10.13 约束（macOS 14 镜像已 deprecated） |
 | macOS x86_64 | `macos-15-intel` | GitHub 已下线 `macos-13`，Intel leg 只能用该镜像 |
 
 `-latest` 会随 GitHub 迁移基础镜像（如 2026-10-19 起 Ubuntu 26）而在无意中抬升二进制依赖下限/改变工具链，
-且发生在「重新打同一个 tag」时不可控。CI 的测试矩阵同样固定为 `ubuntu-22.04` / `macos-14` / `windows-2022`。
+且发生在「重新打同一个 tag」时不可控。CI 的测试矩阵同样固定为 `ubuntu-22.04` / `macos-15` / `windows-2022`。
 
 **缓存 key 必须带镜像标签**（`Swatinem/rust-cache` 的 `key:`）：C 依赖（`aws-lc-sys` / `ring` / `zstd-sys`）
 按构建机的 glibc 头文件编译，而 `rust-cache` 默认只按 `runner.os` 分桶；跨镜像复用 `target/` 会把
@@ -384,8 +384,9 @@ ls -dt "$HOME/Library/Application Support"/xyz.solidway.desktop.bak-* 2>/dev/nul
 - **公证失败即发布失败**：提交被拒、等待超时、钉票或 `spctl` 验收不通过都使 job 失败，不上传、不降级。
 - 本机 `./scripts/package-mac.sh` 与 CI 走同一签名构建链；`scripts/notarize-mac.sh` 同样可在本机独立执行，
   用于复现或应急公证。
-- mac 矩阵（固定镜像，不用 `macos-latest`）：arm64 用 `macos-14`，Intel（x86_64）用 `macos-15-intel`
-  （GitHub 已下线 `macos-13`）；若该镜像未来下线，换当时的 Intel 镜像并同步更新 workflow 与本表。
+- mac 矩阵（固定镜像，不用 `macos-latest`）：arm64 用 `macos-15`，Intel（x86_64）用 `macos-15-intel`。
+  GitHub 已下线 `macos-13`，且 `macos-14` 镜像已标记 deprecated（`macos-latest` 现指向 macOS 26 arm64，故不采用）；
+  若镜像未来变更，同步更新 workflow 与本表。
 - Windows 产物在固定的 `windows-2022` 上构建（同为 tag 触发），不做签名、不依赖 secrets；安装包内
   `solidway.exe` 的落点由 `bundle.resources` 保证，首次发布建议实机确认安装目录。
 

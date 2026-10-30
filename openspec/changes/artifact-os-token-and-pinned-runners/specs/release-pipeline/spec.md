@@ -49,7 +49,7 @@
 
 ### Requirement: 构建环境固定
 
-发布工作流的构建 job MUST 固定到具体 runner 版本：Linux `ubuntu-22.04`、Windows `windows-2022`、macOS arm64 `macos-14`、macOS x86_64 `macos-15-intel`；MUST NOT 使用 `ubuntu-latest` / `windows-latest` / `macos-latest`（`ci.yml` 的测试矩阵同此口径）。
+发布工作流的构建 job MUST 固定到具体 runner 版本：Linux `ubuntu-22.04`、Windows `windows-2022`、macOS arm64 `macos-15`、macOS x86_64 `macos-15-intel`；MUST NOT 使用 `ubuntu-latest` / `windows-latest` / `macos-latest`（`ci.yml` 的测试矩阵同此口径）。
 
 理由：Linux 产物动态链接 glibc，构建机版本决定产物的 glibc 下限；`-latest` 会随 GitHub 迁移基础镜像而在无意中抬高该下限，破坏旧发行版的安装能力。Windows 侧 `-latest` 的镜像漂移会改变 MSVC 与打包工具链版本；macOS 侧漂移会改变 Xcode / SDK 版本，进而影响 dmg 与二进制的最低系统版本。
 
@@ -61,7 +61,7 @@ Linux 基线 MUST 选择能满足 Tauri v2 依赖（`libwebkit2gtk-4.1-dev`）�
 
 #### Scenario: runner 未使用 latest
 - **WHEN** 检查发布工作流各 job 定义
-- **THEN** Linux job 的 `runs-on` 为 `ubuntu-22.04`、Windows job 为 `windows-2022`、macOS 矩阵为 `macos-14` / `macos-15-intel`，不存在任何 `-latest` 标签
+- **THEN** Linux job 的 `runs-on` 为 `ubuntu-22.04`、Windows job 为 `windows-2022`、macOS 矩阵为 `macos-15` / `macos-15-intel`，不存在任何 `-latest` 标签
 
 #### Scenario: 基线变更需显式声明
 - **WHEN** 维护者把任一平台基线改为其他版本

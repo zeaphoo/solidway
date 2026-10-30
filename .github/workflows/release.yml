@@ -145,11 +145,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # GitHub 已下线 macos-13；Intel leg 改用当时的 Intel 镜像 macos-15-intel。
+          # GitHub 已下线 macos-13 且 macOS 14 镜像已标记 deprecated，arm64 统一用 macos-15、Intel leg 用 macos-15-intel。
           # 若该镜像未来下线，换当时的 Intel 镜像（同步 packaging/README.md）。
           - runner: macos-15-intel
             arch: x86_64
-          - runner: macos-14
+          - runner: macos-15
             arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
