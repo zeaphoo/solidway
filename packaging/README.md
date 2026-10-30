@@ -194,8 +194,8 @@ sudo groupdel solidway
 产物：
 
 ```text
-solidway-app_<version>_<arch>.deb      # 包名 solidway-app（避免与服务包 solidway 同名）
-solidway-app_<version>_<arch>.AppImage  # 单文件，自带 webkit 与网关
+solidway-app_<version>_linux_<arch>.deb      # 包名 solidway-app（避免与服务包 solidway 同名）
+solidway-app_<version>_linux_<arch>.AppImage  # 单文件，自带 webkit 与网关
 ```
 
 两者都把网关二进制打进 `usr/lib/Solidway/solidway`（bundle.resources），只装客户端即可运行；
@@ -229,10 +229,10 @@ Linux 构建需要 Tauri 的系统依赖（`libwebkit2gtk-4.1-dev`、`libayatana
 默认输出到 `dist/windows/`：
 
 ```text
-solidway-app_<version>_x64-setup.exe      # NSIS（中英双语 + 语言选择）
-solidway-app_<version>_x64_en-US.msi      # WiX，按语言各一份（TAURI_BUNDLES 含 msi 时）
-solidway-app_<version>_x64_zh-CN.msi
-solidway-app_<version>_x64_portable.zip # 便携版（两个 exe 同目录）
+solidway-app_<version>_windows_x64-setup.exe      # NSIS（中英双语 + 语言选择）
+solidway-app_<version>_windows_x64_en-US.msi      # WiX，按语言各一份（TAURI_BUNDLES 含 msi 时）
+solidway-app_<version>_windows_x64_zh-CN.msi
+solidway-app_<version>_windows_x64_portable.zip # 便携版（两个 exe 同目录）
 ```
 
 ### 安装器语言与安装路径
@@ -268,7 +268,7 @@ Windows 与 macOS 默认的文件系统**不区分大小写**：`Solidway.exe` �
 
 ## macOS desktop app
 
-产出 **Developer ID 签名 + Apple 公证**的 `Solidway.app` 与 `solidway-app_<version>_<arch>.dmg`
+产出 **Developer ID 签名 + Apple 公证**的 `Solidway.app` 与 `solidway-app_<version>_macos_<arch>.dmg`
 （hardened runtime，禁 ad-hoc；`.app` 与 dmg 双钉票，离线首开不依赖在线校验）。dmg 为**安装盘**：
 `Solidway.app` 居左、`Applications` 链接居右，窗口固定 660×420；窗口背景使用 Finder 默认呈现
 （macOS 26 起系统忽略 dmg 自定义背景图/纯色，打包链不写背景键）。
@@ -301,7 +301,7 @@ MAC_SIGN_IDENTITY="Developer ID Application: <姓名> (<TeamID>)" ./scripts/pack
 
 ```text
 Solidway.app
-solidway-app_<version>_<arch>.dmg   # 安装盘（窗口/图标布局 + Applications 链接）
+solidway-app_<version>_macos_<arch>.dmg   # 安装盘（窗口/图标布局 + Applications 链接）
 ```
 
 打包顺序固定（顺序错会产生不含 `solidway` 或未签名的坏 dmg）：
@@ -333,9 +333,9 @@ open /Applications/Solidway.app
 codesign --verify --deep --strict dist/mac/Solidway.app
 codesign -dv --verbose=2 dist/mac/Solidway.app   # Authority=Developer ID Application、flags 含 runtime
 xcrun stapler validate dist/mac/Solidway.app
-xcrun stapler validate dist/mac/solidway-app_<version>_<arch>.dmg
+xcrun stapler validate dist/mac/solidway-app_<version>_macos_<arch>.dmg
 # dmg 本体不做 spctl 评估（无 Mach-O 签名可评）；挂载后验收内部 .app：
-hdiutil attach -nobrowse -readonly dist/mac/solidway-app_<version>_<arch>.dmg
+hdiutil attach -nobrowse -readonly dist/mac/solidway-app_<version>_macos_<arch>.dmg
 spctl -a -vv /Volumes/Solidway/Solidway.app
 hdiutil detach /Volumes/Solidway
 # 期望 spctl 输出分行含 accepted 与 source=Notarized Developer ID

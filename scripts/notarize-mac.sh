@@ -207,7 +207,7 @@ if ! stapler_retry validate "$APP"; then
 fi
 
 ARCH="$(uname -m)"
-DMG="$DIST_DIR/solidway-app_${version}_${ARCH}.dmg"
+DMG="$DIST_DIR/solidway-app_${version}_macos_${ARCH}.dmg"
 rm -f "$DMG"
 echo "由已钉票 .app 重建 dmg：$DMG"
 "$ROOT/scripts/dmg-layout.sh" "$APP" "$DMG" "$APP_NAME"
