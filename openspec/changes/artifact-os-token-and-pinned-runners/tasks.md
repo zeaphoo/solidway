@@ -13,6 +13,7 @@
 - [x] 2.1 `.github/workflows/release.yml`：全部 Ubuntu job 改 `ubuntu-22.04`（verify / linux-service / linux-app / release），Windows job 改 `windows-2022`
 - [x] 2.2 `.github/workflows/ci.yml`：Ubuntu matrix 与两个 Ubuntu job 改 `ubuntu-22.04`，Windows job 改 `windows-2022`，macOS matrix 改 `macos-14`（发布侧 mac 矩阵本已固定 `macos-14` / `macos-15-intel`）
 - [x] 2.3 两个 workflow YAML 解析通过
+- [x] 2.4 修正 22.04 首跑失败：`rust-cache` 默认按 `runner.os` 分桶，把 24.04 上编译的 `aws-lc-sys` 复用到 22.04，链接报 `__isoc23_sscanf` / `__isoc23_strtol`；所有 rust-cache 步骤加 `key:`（`ubuntu-22.04` / `${{ matrix.os }}` / `${{ matrix.runner }}` / `windows-2022`）。验证：run #19 日志显示 `Image: ubuntu-22.04` + `Restored ... Linux-x64 ... full match: true`，确认缓存跨镜像复用
 
 ## 3. 文档
 

@@ -57,6 +57,8 @@ Linux 基线 MUST 选择能满足 Tauri v2 依赖（`libwebkit2gtk-4.1-dev`）�
 
 更换基线版本 MUST 由显式改动 runner 标签完成，并 MUST 在 `packaging/README.md` 记录当前基线与 glibc 下限。
 
+构建缓存的 key MUST 包含 runner 镜像标识（不能只依赖 `runner.os`）：C 依赖按构建机 glibc 头文件编译，跨镜像复用缓存会把新 glibc 的目标文件链接到旧镜像，产生 `__isoc23_*` 一类未定义符号。
+
 #### Scenario: runner 未使用 latest
 - **WHEN** 检查发布工作流各 job 定义
 - **THEN** Linux job 的 `runs-on` 为 `ubuntu-22.04`、Windows job 为 `windows-2022`、macOS 矩阵为 `macos-14` / `macos-15-intel`，不存在任何 `-latest` 标签
@@ -64,3 +66,7 @@ Linux 基线 MUST 选择能满足 Tauri v2 依赖（`libwebkit2gtk-4.1-dev`）�
 #### Scenario: 基线变更需显式声明
 - **WHEN** 维护者把任一平台基线改为其他版本
 - **THEN** 改动以显式 runner 标签提交，并同步 `packaging/README.md` 中的基线与 glibc 下限说明
+
+#### Scenario: 缓存不跨镜像复用
+- **WHEN** 某 job 的 runner 镜像发生变化（如 24.04 → 22.04）
+- **THEN** Rust 构建缓存的 key 随之变化，不复用旧镜像编译出的 `target/` 产物

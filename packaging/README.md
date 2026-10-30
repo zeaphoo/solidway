@@ -109,6 +109,10 @@ solidway-<version>-1.<arch>.rpm
 `-latest` 会随 GitHub 迁移基础镜像（如 2026-10-19 起 Ubuntu 26）而在无意中抬升二进制依赖下限/改变工具链，
 且发生在「重新打同一个 tag」时不可控。CI 的测试矩阵同样固定为 `ubuntu-22.04` / `macos-14` / `windows-2022`。
 
+**缓存 key 必须带镜像标签**（`Swatinem/rust-cache` 的 `key:`）：C 依赖（`aws-lc-sys` / `ring` / `zstd-sys`）
+按构建机的 glibc 头文件编译，而 `rust-cache` 默认只按 `runner.os` 分桶；跨镜像复用 `target/` 会把
+新 glibc 的目标文件链接到旧镜像上，报 `undefined symbol: __isoc23_sscanf` / `__isoc23_strtol`（glibc ≥ 2.38 的 C23 重定向）。
+
 `ubuntu-22.04` 的 `universe` 源已提供 Tauri v2 所需的 `libwebkit2gtk-4.1-dev`（jammy-updates 为 2.50.x），
 桌面客户端可正常构建；若要再降基线，需确认目标镜像有该包（22.04 之前没有 4.1 ABI）。
 

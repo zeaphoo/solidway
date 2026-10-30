@@ -15,6 +15,7 @@
 
 ### Fixed
 
+- **Linux 22.04 构建失败**：`rust-cache` 默认只按 `runner.os` 分桶，把 24.04（glibc 2.39）上编译的 `aws-lc-sys` 目标文件复用到 22.04（glibc 2.35）上，链接时报 `undefined symbol: __isoc23_sscanf` / `__isoc23_strtol`；现所有缓存步骤的 `key` 带上 runner 镜像标签（`ubuntu-22.04` / `macos-14` / `macos-15-intel` / `windows-2022`）。
 - **发布资产**：Windows 便携版的 `solidway.exe` / `SolidwayApp.exe` 不再作为独立 Release 资产上传（发布物只有便携 zip，避免重复下载与体积误解）；发布收集步骤跳过 `*/portable/*`。
 
 ## [0.5.0-rc.1] - 2026-10-30

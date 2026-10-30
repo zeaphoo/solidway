@@ -68,7 +68,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      # 缓存 key 必须带镜像标签：aws-lc-sys 等 C 依赖按构建机 glibc 头文件编译，
+      # 跨镜像（24.04 → 22.04）复用 target/ 会出现 `__isoc23_*` 未定义符号。
       - uses: Swatinem/rust-cache@v2
+        with:
+          key: ubuntu-22.04
       - uses: pnpm/action-setup@v4
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -100,6 +104,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
+          key: ubuntu-22.04
           workspaces: |
             . -> target
             app -> target
@@ -152,6 +157,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
+          key: ${{ matrix.runner }}
           workspaces: |
             . -> target
             app -> target
@@ -346,6 +352,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
+          key: windows-2022
           workspaces: |
             . -> target
             app -> target
