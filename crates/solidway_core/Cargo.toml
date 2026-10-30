@@ -18,7 +18,11 @@ reqwest.workspace = true
 futures-util.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
+flate2.workspace = true
+brotli-decompressor.workspace = true
+zstd.workspace = true
 gcp_auth = "0.12"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+flate2.workspace = true

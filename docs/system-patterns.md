@@ -46,6 +46,7 @@
 - 健康状态持久化于 `provider_health` 表，启动时**全量回灌**（含冷却截止）。
 - 运行期参数归属：连接/首字节超时、冷却、`affinity_ttl`、会话 TTL 全在 DB settings（仅 admin）。地址与端口改动需重启；超时即时生效。
 - 用量统计（模式 B）：聚合桶（小时/天 + 延迟直方图 + token）内存累加后定期落盘；事件分 `Access`（请求 / TTFB / bytes_in）与 `Completion`（outcome / duration / bytes_out / token）；逐条明细按 `usage.detail_mode` 保留；普通统计 `/api/usage/*` 按 owner 隔离，全局统计 `/api/admin/usage/*` 仅 admin。
+- token 采集口径：上游响应带 `content-encoding` 时按 `gzip` / `deflate` / `br` / `zstd` **旁路解码**再解析 usage，转发字节与 `content-encoding` 头原样保留；OpenAI Chat 流式请求缺失 `stream_options` 时数据面补 `include_usage`（否则上游不回传 usage，token 恒 0）；解析不到即记 `usage_missing`，不估算。
 - 统计时间桶按 `usage.timezone_offset_minutes` 的固定 UTC 偏移对齐；hour 保留 365 天、day 保留 730 天；不使用分钟桶。
 - 运维：`provider_health` 可在界面查看（冷却/退役 + 原因）；仅 admin 可人工解除标记（`DELETE /api/provider-health/{id}`，删行后即时下发）。
 

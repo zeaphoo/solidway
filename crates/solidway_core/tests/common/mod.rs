@@ -43,6 +43,28 @@ pub enum Behavior {
         body: String,
         delay: std::time::Duration,
     },
+    /// `content-encoding: gzip` 的 JSON 响应（带 usage），用于旁路解码取用量。
+    GzipJson,
+    /// `content-encoding: gzip` 的 SSE 响应（带 usage chunk），跨块下发。
+    GzipSse,
+}
+
+/// gzip 压缩固定的 JSON 响应体（`GzipJson` 行为）。
+pub const GZIP_JSON_RAW: &str = r#"{"id":"x","usage":{"prompt_tokens":40,"completion_tokens":8,"prompt_tokens_details":{"cached_tokens":6}}}"#;
+
+/// gzip 压缩固定的 SSE 响应体（`GzipSse` 行为）：第二个 chunk 携带 usage。
+pub const GZIP_SSE_RAW: &str = concat!(
+    "data: {\"id\":\"x\",\"choices\":[{\"delta\":{\"content\":\"hi\"}}]}\n\n",
+    "data: {\"id\":\"x\",\"choices\":[],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":20}}\n\n",
+    "data: [DONE]\n\n",
+);
+
+/// 测试用 gzip 压缩。
+pub fn gzip_bytes(raw: &[u8]) -> Vec<u8> {
+    use std::io::Write;
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    encoder.write_all(raw).unwrap();
+    encoder.finish().unwrap()
 }
 
 /// 上游收到的一次请求（保真断言用）。
@@ -136,6 +158,37 @@ async fn mock_handler(
                 .cloned()
                 .unwrap_or(serde_json::Value::Null);
             axum::Json(serde_json::json!({"model": model, "ok": true})).into_response()
+        }
+        Behavior::GzipJson => {
+            let encoded = gzip_bytes(GZIP_JSON_RAW.as_bytes());
+            let split = encoded.len() / 2;
+            let chunks: Vec<Result<Bytes, std::io::Error>> = vec![
+                Ok(Bytes::from(encoded[..split].to_vec())),
+                Ok(Bytes::from(encoded[split..].to_vec())),
+            ];
+            Response::builder()
+                .header("content-type", "application/json")
+                .header("content-encoding", "gzip")
+                .body(axum::body::Body::from_stream(futures_util::stream::iter(
+                    chunks,
+                )))
+                .unwrap()
+        }
+        Behavior::GzipSse => {
+            let encoded = gzip_bytes(GZIP_SSE_RAW.as_bytes());
+            // 切成 3 块：gzip 头、载荷中段、尾段，验证跨块解码。
+            let step = encoded.len() / 3 + 1;
+            let chunks: Vec<Result<Bytes, std::io::Error>> = encoded
+                .chunks(step)
+                .map(|piece| Ok(Bytes::from(piece.to_vec())))
+                .collect();
+            Response::builder()
+                .header("content-type", "text/event-stream")
+                .header("content-encoding", "gzip")
+                .body(axum::body::Body::from_stream(futures_util::stream::iter(
+                    chunks,
+                )))
+                .unwrap()
         }
         Behavior::AnthropicStream => {
             let value: serde_json::Value = serde_json::from_slice(&body).unwrap_or_default();

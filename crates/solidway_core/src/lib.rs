@@ -11,6 +11,7 @@
 
 pub mod affinity;
 pub mod config;
+pub mod decode;
 pub mod engine;
 pub mod event;
 pub mod health;
@@ -26,6 +27,7 @@ pub use config::{
     ProviderHealthSeed, ProviderMetricSeed, RouteEntry, RouteSelection, SelectionStrategy,
     SelectionThresholds, SelectionWeights,
 };
+pub use decode::{BodyDecoder, ContentEncoding};
 pub use engine::{Core, CoreError, GatewayErrorCode, hash_api_key};
 pub use event::{
     AccessEvent, AttemptEvent, CompletionEvent, CompletionOutcome, CoreEvent, EventBus,

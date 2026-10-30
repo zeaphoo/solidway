@@ -21,6 +21,7 @@ use sha2::{Digest, Sha256};
 
 use crate::affinity::Affinity;
 use crate::config::{AffinitySeed, ApiFormat, CoreConfig, CoreOptions};
+use crate::decode::{BodyDecoder, ContentEncoding, decode_bytes};
 use crate::event::{
     AccessEvent, AttemptEvent, CompletionEvent, CompletionOutcome, CoreEvent, EventBus,
 };
@@ -561,6 +562,9 @@ impl Core {
         let family = target.family();
         let api_format = format.as_str();
         let generation = target.is_generation();
+        // OpenAI 家族流式默认不回传 usage（需 `stream_options.include_usage`）：
+        // 缺失时补上，否则 token 统计恒为 0。Anthropic 原生流与 Responses 本就带 usage。
+        let want_stream_usage = matches!(target, Inbound::ChatCompletions);
         let client_path = uri.path().to_string();
         // 凭据类 query 参数（`key` / `api_key`）绝不外传；其余原样保留。
         let query = clean_query(uri.query().unwrap_or_default());
@@ -617,6 +621,9 @@ impl Core {
                 upstream_model,
             );
             body = rendered.body;
+            if want_stream_usage {
+                body = ensure_stream_usage(&body);
+            }
             let base = provider.base_url.trim_end_matches('/');
             let url = match rendered.path {
                 Some(target_path) => join_target(base, &target_path, query.as_deref()),
@@ -1214,6 +1221,12 @@ impl Core {
             .map(|value| value.to_ascii_lowercase())
             .unwrap_or_default();
         let is_sse = content_type.starts_with("text/event-stream");
+        // 压缩只影响旁路解析：转发字节按原样透传，`content-encoding` 也照原回给客户端。
+        let content_encoding = headers
+            .get(header::CONTENT_ENCODING)
+            .and_then(|value| value.to_str().ok())
+            .map(ContentEncoding::parse)
+            .unwrap_or_default();
         // Bedrock 的流式响应是二进制事件流（非 SSE）：只透传、不解析 usage。
         let is_event_stream = content_type.starts_with("application/vnd.amazon.eventstream");
 
@@ -1229,6 +1242,8 @@ impl Core {
             Body::from_stream(ObservedSseStream {
                 inner: base,
                 pending: Vec::new(),
+                decoder: (!content_encoding.is_identity())
+                    .then(|| BodyDecoder::new(content_encoding)),
                 reporter: StreamReporter::new(self.events.clone(), meta),
             })
         } else if is_event_stream {
@@ -1249,8 +1264,13 @@ impl Core {
             .await;
             match result {
                 Ok(bytes) => {
-                    let parsed = serde_json::from_slice::<Value>(&bytes).unwrap_or(Value::Null);
-                    let usage = extract_usage_from_json(&parsed);
+                    // usage 只在旁路解码后的明文上解析；发给客户端的仍是原始字节。
+                    let parsed = match content_encoding {
+                        ContentEncoding::Identity => serde_json::from_slice::<Value>(&bytes).ok(),
+                        kind => decode_bytes(kind, &bytes)
+                            .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok()),
+                    };
+                    let usage = parsed.as_ref().and_then(extract_usage_from_json);
                     let bytes_out = bytes.len() as u64;
                     let bytes = match &alias {
                         Some(alias) => rewrite_alias_json(&bytes, alias),
@@ -1826,6 +1846,8 @@ impl StreamReporter {
 struct ObservedSseStream {
     inner: Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
     pending: Vec<u8>,
+    /// 旁路解码器：只在 `content-encoding` 非 identity 时存在，输出只喂给行解析。
+    decoder: Option<BodyDecoder>,
     reporter: StreamReporter,
 }
 
@@ -1836,7 +1858,11 @@ impl Stream for ObservedSseStream {
         match self.inner.as_mut().poll_next(cx) {
             Poll::Ready(Some(Ok(chunk))) => {
                 self.reporter.bytes_out += chunk.len() as u64;
-                self.pending.extend_from_slice(&chunk);
+                let decoded = match self.decoder.as_mut() {
+                    Some(decoder) => decoder.push(&chunk),
+                    None => chunk.to_vec(),
+                };
+                self.pending.extend_from_slice(&decoded);
                 while let Some(position) = self.pending.iter().position(|byte| *byte == b'\n') {
                     let line: Vec<u8> = self.pending.drain(..=position).collect();
                     self.reporter.observe_line(&line);
@@ -1854,6 +1880,10 @@ impl Stream for ObservedSseStream {
                 Poll::Ready(Some(Err(error)))
             }
             Poll::Ready(None) => {
+                if let Some(decoder) = self.decoder.as_mut() {
+                    let tail = decoder.finish();
+                    self.pending.extend_from_slice(&tail);
+                }
                 if !self.pending.is_empty() {
                     let tail = std::mem::take(&mut self.pending);
                     self.reporter.observe_line(&tail);
@@ -1904,6 +1934,45 @@ impl Drop for ObservedJsonStream {
     fn drop(&mut self) {
         self.reporter.finish(CompletionOutcome::Aborted);
     }
+}
+
+/// 流式 chat 请求缺少 `stream_options.include_usage` 时补上 `true`。
+///
+/// 只向顶层对象末尾插入一个成员，其余字节保持原样；非流式、已声明
+/// `stream_options`（客户端自选）或非 JSON 对象都原样返回。
+fn ensure_stream_usage(raw: &Bytes) -> Bytes {
+    const MEMBER: &str = r#""stream_options":{"include_usage":true}"#;
+    let Ok(value) = serde_json::from_slice::<Value>(raw) else {
+        return raw.clone();
+    };
+    let Some(object) = value.as_object() else {
+        return raw.clone();
+    };
+    if object.get("stream") != Some(&Value::Bool(true)) || object.contains_key("stream_options") {
+        return raw.clone();
+    }
+    match insert_top_level_member(raw, MEMBER) {
+        Some(inserted) => Bytes::from(inserted),
+        None => raw.clone(),
+    }
+}
+
+/// 在顶层对象的收尾 `}` 前插入一个成员（`{}` 时不加逗号）。
+fn insert_top_level_member(raw: &[u8], member: &str) -> Option<Vec<u8>> {
+    let end = raw.iter().rposition(|byte| *byte == b'}')?;
+    let mut before = end;
+    while before > 0 && raw[before - 1].is_ascii_whitespace() {
+        before -= 1;
+    }
+    let empty_object = raw.get(before.checked_sub(1)?) == Some(&b'{');
+    let mut out = Vec::with_capacity(raw.len() + member.len() + 1);
+    out.extend_from_slice(&raw[..end]);
+    if !empty_object {
+        out.push(b',');
+    }
+    out.extend_from_slice(member.as_bytes());
+    out.extend_from_slice(&raw[end..]);
+    Some(out)
 }
 
 /// 只改写 JSON 文本中**顶层** `key` 的字符串值，其余字节保持不变。
@@ -2691,6 +2760,45 @@ mod tests {
 
         let anthropic_503 = GatewayErrorCode::RouteExhausted.error_body(Family::Anthropic);
         assert_eq!(anthropic_503["error"]["type"], "api_error");
+    }
+
+    #[test]
+    fn stream_usage_is_injected_only_for_streaming_chat() {
+        let inject = |raw: &str| {
+            let body = Bytes::from(raw.to_string());
+            let patched = ensure_stream_usage(&body);
+            if patched == body { None } else { Some(patched) }
+        };
+
+        // 流式且未声明 `stream_options`：末尾插入，其余字节原样。
+        assert_eq!(
+            inject(r#"{"model":"m","stream":true}"#).unwrap(),
+            Bytes::from_static(
+                br#"{"model":"m","stream":true,"stream_options":{"include_usage":true}}"#
+            )
+        );
+        // 带空白与新行：只在收尾大括号前插入第三个成员。
+        assert_eq!(
+            inject("{\n  \"stream\": true,\n  \"model\": \"m\"\n}\n").unwrap(),
+            Bytes::from_static(
+                b"{\n  \"stream\": true,\n  \"model\": \"m\"\n,\"stream_options\":{\"include_usage\":true}}\n"
+            )
+        );
+        // 空对象形态。
+        assert_eq!(
+            inject(r#"{"stream":true}"#).unwrap(),
+            Bytes::from_static(br#"{"stream":true,"stream_options":{"include_usage":true}}"#)
+        );
+        // 非流式 / 已声明 `stream_options` / 非对象 / 非法 JSON：一律不碰。
+        for raw in [
+            r#"{"model":"m","stream":false}"#,
+            r#"{"model":"m"}"#,
+            r#"{"stream":true,"stream_options":{}}"#,
+            r#"[{"stream":true}]"#,
+            r#"not json"#,
+        ] {
+            assert!(inject(raw).is_none(), "不应改写: {raw}");
+        }
     }
 
     #[test]

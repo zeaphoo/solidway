@@ -28,6 +28,10 @@ uuid = { version = "1", features = ["v4"] }
 base64 = "0.22"
 hex = "0.4"
 zeroize = "1"
+# 用量旁路解码：只用于观察，不参与转发。
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+brotli-decompressor = "6"
+zstd = { version = "0.14", default-features = false }
 time = { version = "0.3", features = ["local-offset"] }
 thiserror = "2"
 async-trait = "0.1"
