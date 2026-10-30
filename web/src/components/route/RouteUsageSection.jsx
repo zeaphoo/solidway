@@ -79,7 +79,7 @@ export default function RouteUsageSection({ routeId }) {
           />
         )}
 
-        <div className="grid gap-4 border-t pt-4 lg:grid-cols-2">
+        <div className="space-y-4 border-t pt-4">
           <div className="space-y-2">
             <div className="text-sm font-medium">{t('usage.modelBreakdown')}</div>
             {models.isError ? (

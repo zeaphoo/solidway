@@ -139,7 +139,7 @@ fn validate_aws_credentials(raw: &str) -> Result<()> {
     Ok(())
 }
 
-/// 掩码：只暴露 access key 后 4 位。
+/// 掩码：暴露 access key id 首尾各 4 个字符，便于人工核对。
 fn aws_credentials_masked(raw: &str) -> String {
     let access_key = serde_json::from_str::<serde_json::Value>(raw)
         .ok()
@@ -150,15 +150,39 @@ fn aws_credentials_masked(raw: &str) -> String {
                 .map(str::to_string)
         })
         .unwrap_or_default();
-    let tail: String = access_key
-        .chars()
-        .rev()
-        .take(4)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect();
-    format!("aws:{tail}")
+    format!("aws:{}", Cipher::mask(&access_key))
+}
+
+/// 按凭据类型校验内容并生成展示用掩码。
+fn validate_and_mask(kind: &str, raw: &str) -> Result<String> {
+    match kind {
+        "google_service_account" => {
+            validate_service_account(raw)?;
+            Ok(service_account_masked(raw))
+        }
+        "aws_sigv4" => {
+            validate_aws_credentials(raw)?;
+            Ok(aws_credentials_masked(raw))
+        }
+        _ => {
+            validate_api_key(raw)?;
+            Ok(Cipher::mask(raw))
+        }
+    }
+}
+
+/// 展示用 DTO：掩码按当前规则从密文重新计算，保证掩码格式变更对存量凭据立即生效。
+fn provider_key_dto(state: &AppState, row: ProviderKeyRow) -> ProviderKeyDto {
+    let remasked = state
+        .cipher
+        .decrypt(&row.credential_ciphertext, &aad_for(&row.id))
+        .ok()
+        .and_then(|raw| validate_and_mask(&row.credential_kind, &raw).ok());
+    let mut dto = ProviderKeyDto::from(row);
+    if let Some(masked) = remasked {
+        dto.credential_masked = masked;
+    }
+    dto
 }
 
 fn service_account_masked(raw: &str) -> String {
@@ -1016,7 +1040,11 @@ pub async fn list_provider_keys(
 ) -> Result<Json<Vec<ProviderKeyDto>>> {
     ensure_owned_route(&state, &user, &route_id).await?;
     let rows = provider_keys::list_by_route(&state.pool, &route_id).await?;
-    Ok(Json(rows.into_iter().map(ProviderKeyDto::from).collect()))
+    Ok(Json(
+        rows.into_iter()
+            .map(|row| provider_key_dto(&state, row))
+            .collect(),
+    ))
 }
 
 pub async fn create_provider_key(
@@ -1064,20 +1092,7 @@ pub async fn create_provider_key(
             ));
         }
     }
-    let credential_masked = match credential_kind.as_str() {
-        "google_service_account" => {
-            validate_service_account(&credential)?;
-            service_account_masked(&credential)
-        }
-        "aws_sigv4" => {
-            validate_aws_credentials(&credential)?;
-            aws_credentials_masked(&credential)
-        }
-        _ => {
-            validate_api_key(&credential)?;
-            Cipher::mask(&credential)
-        }
-    };
+    let credential_masked = validate_and_mask(&credential_kind, &credential)?;
 
     let mut endpoint = resolve_endpoint(
         &provider,
@@ -1232,7 +1247,7 @@ pub async fn create_provider_key(
     }
 
     state.sync_core_best_effort().await;
-    let mut dto = ProviderKeyDto::from(row);
+    let mut dto = provider_key_dto(&state, row);
     dto.autodiscover = Some(autodiscover);
     Ok((StatusCode::CREATED, Json(dto)))
 }
@@ -1246,7 +1261,7 @@ pub async fn get_provider_key(
         .await?
         .ok_or(ApiError::NotFound)?;
     ensure_owned_route(&state, &user, &row.route_id).await?;
-    Ok(Json(ProviderKeyDto::from(row)))
+    Ok(Json(provider_key_dto(&state, row)))
 }
 
 pub async fn update_provider_key(
@@ -1363,20 +1378,7 @@ pub async fn update_provider_key(
             }
         }
         let aad = aad_for(&row.id);
-        let masked = match kind {
-            "google_service_account" => {
-                validate_service_account(&raw)?;
-                service_account_masked(&raw)
-            }
-            "aws_sigv4" => {
-                validate_aws_credentials(&raw)?;
-                aws_credentials_masked(&raw)
-            }
-            _ => {
-                validate_api_key(&raw)?;
-                Cipher::mask(&raw)
-            }
-        };
+        let masked = validate_and_mask(kind, &raw)?;
         row.credential_ciphertext = state.cipher.encrypt(&raw, &aad)?;
         row.credential_masked = masked;
         row.credential_hash = state.cipher.fingerprint(&raw)?;
@@ -1399,7 +1401,7 @@ pub async fn update_provider_key(
 
     provider_keys::update(&state.pool, &row).await?;
     state.sync_core_best_effort().await;
-    Ok(Json(ProviderKeyDto::from(row)))
+    Ok(Json(provider_key_dto(&state, row)))
 }
 
 pub async fn delete_provider_key(

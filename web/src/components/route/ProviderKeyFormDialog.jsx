@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CopyIcon, PlusIcon, TrashIcon } from 'lucide-react'
+import { CopyIcon, PencilIcon, PlusIcon, TrashIcon, Undo2Icon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -49,7 +49,9 @@ const schema = z.object({
   api_formats: z.array(z.string()),
   auth_scheme: z.string().min(1),
   credential: z.string().optional(),
-  models: z.array(z.object({ name: z.string(), upstream: z.string() })),
+  models: z.array(
+    z.object({ name: z.string(), upstream: z.string(), renamed: z.boolean().optional() }),
+  ),
   priority: z.coerce.number().int().min(1).max(1000),
   status: z.enum(['active', 'inactive']),
 })
@@ -102,10 +104,31 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
   })
 
   const discover = useDiscoverModels()
-  const { fields: modelFields, append: appendModel, remove: removeModel } = useFieldArray({
+  const {
+    fields: modelFields,
+    append: appendModel,
+    replace: replaceModels,
+    remove: removeModel,
+  } = useFieldArray({
     control,
     name: 'models',
   })
+  const modelsValue = useWatch({ control, name: 'models' })
+  // 默认只显示一个模型 id；需要对外改名时才展开「上游 id + 对外名称」两列。
+  const renameModel = (index) => {
+    const currentName = (getValues(`models.${index}.name`) ?? '').trim()
+    if (!(getValues(`models.${index}.upstream`) ?? '').trim()) {
+      setValue(`models.${index}.upstream`, currentName)
+    }
+    setValue(`models.${index}.renamed`, true)
+  }
+  const unrenameModel = (index) => {
+    const upstream = (getValues(`models.${index}.upstream`) ?? '').trim()
+    const currentName = (getValues(`models.${index}.name`) ?? '').trim()
+    setValue(`models.${index}.name`, upstream || currentName)
+    setValue(`models.${index}.upstream`, '')
+    setValue(`models.${index}.renamed`, false)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -126,7 +149,10 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
           ? providerKey.auth_scheme
           : 'bearer',
       credential: '',
-      models: providerKey?.models ?? [],
+      models: (providerKey?.models ?? []).map((mapping) => ({
+        ...mapping,
+        renamed: (mapping.upstream ?? '').trim() !== (mapping.name ?? '').trim(),
+      })),
       priority: providerKey?.priority ?? 1,
       status: providerKey?.status ?? 'active',
     })
@@ -238,11 +264,40 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
       {
         onSuccess: (result) => {
           if (result.models?.length) {
-            const existing = new Set((getValues('models') ?? []).map((item) => item.name.trim()))
-            const added = result.models
-              .filter((name) => !existing.has(name))
-              .map((name) => ({ name, upstream: name }))
-            if (added.length) appendModel(added)
+            // 以上游模型 id 为身份合并：保留已改的对外名称与手动新增项，
+            // 顺序以上游返回列表为准（手动新增项排在最后）。
+            const identity = (row) => (row?.upstream?.trim() || row?.name?.trim() || '')
+            const current = getValues('models') ?? []
+            const known = new Map()
+            for (const row of current) {
+              const key = identity(row)
+              if (key && !known.has(key)) known.set(key, row)
+            }
+            const merged = []
+            const seen = new Set()
+            for (const raw of result.models) {
+              const key = String(raw).trim()
+              if (!key || seen.has(key)) continue
+              seen.add(key)
+              const row = known.get(key)
+              merged.push(
+                row
+                  ? {
+                      ...row,
+                      name: (row.name ?? '').trim() || key,
+                      upstream: row.upstream ?? '',
+                      renamed: Boolean(row.renamed),
+                    }
+                  : { name: key, upstream: '', renamed: false },
+              )
+            }
+            for (const row of current) {
+              const key = identity(row)
+              if (key && seen.has(key)) continue
+              if (key) seen.add(key)
+              merged.push(row)
+            }
+            replaceModels(merged)
             toast.success(t('providers.fetchOk', { count: result.models.length }))
           } else {
             toast.error(
@@ -551,7 +606,11 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
                   id="key-credential"
                   ref={credentialRef}
                   className="min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder={t('providers.credentialPlaceholder')}
+                  placeholder={
+                    isEdit && providerKey?.credential_masked
+                      ? t('providers.credentialCurrent', { masked: providerKey.credential_masked })
+                      : t('providers.credentialPlaceholder')
+                  }
                   {...register('credential')}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -592,7 +651,7 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => appendModel({ name: '', upstream: '' })}
+                      onClick={() => appendModel({ name: '', upstream: '', renamed: false })}
                     >
                       <PlusIcon className="size-4" />
                       {t('providers.addModel')}
@@ -609,30 +668,83 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
                     </Button>
                   </div>
                 </div>
+                <p className="text-xs text-muted-foreground">{t('providers.modelsHint')}</p>
                 {modelFields.length ? (
                   <div className="max-h-56 overflow-y-auto">
                     <div className="space-y-2 px-1">
-                      {modelFields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
-                          <Input
-                            placeholder={t('providers.modelNamePlaceholder')}
-                            {...register(`models.${index}.name`)}
-                          />
-                          <Input
-                            placeholder={t('providers.modelUpstreamPlaceholder')}
-                            {...register(`models.${index}.upstream`)}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => removeModel(index)}
-                            aria-label={t('providers.removeModel')}
-                          >
-                            <TrashIcon className="size-4" />
-                          </Button>
-                        </div>
-                      ))}
+                      {modelFields.map((field, index) => {
+                        const renamed = modelsValue?.[index]?.renamed ?? false
+                        return (
+                          <div key={field.id} className="flex items-start gap-2">
+                            {/* 始终占两等分：单列时输入框只占左半格，与展开后单列宽度一致。 */}
+                            <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                              {renamed ? (
+                                <>
+                                  <div className="min-w-0 space-y-1 rounded-lg border border-dashed p-2">
+                                    <span className="text-xs font-medium text-muted-foreground">
+                                      {t('providers.modelUpstream')}
+                                    </span>
+                                    <Input
+                                      placeholder={t('providers.modelUpstreamPlaceholder')}
+                                      {...register(`models.${index}.upstream`)}
+                                    />
+                                  </div>
+                                  <div className="min-w-0 space-y-1 rounded-lg border border-dashed p-2">
+                                    <span className="text-xs font-medium text-muted-foreground">
+                                      {t('providers.modelName')}
+                                    </span>
+                                    <Input
+                                      placeholder={t('providers.modelNamePlaceholder')}
+                                      {...register(`models.${index}.name`)}
+                                    />
+                                  </div>
+                                </>
+                              ) : (
+                                <Input
+                                  placeholder={t('providers.modelIdPlaceholder')}
+                                  {...register(`models.${index}.name`)}
+                                />
+                              )}
+                            </div>
+                            <div
+                              className={`flex shrink-0 items-center gap-1 ${renamed ? 'mt-7' : ''}`}
+                            >
+                              {renamed ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title={t('providers.modelUnrename')}
+                                  aria-label={t('providers.modelUnrename')}
+                                  onClick={() => unrenameModel(index)}
+                                >
+                                  <Undo2Icon className="size-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  title={t('providers.modelRename')}
+                                  aria-label={t('providers.modelRename')}
+                                  onClick={() => renameModel(index)}
+                                >
+                                  <PencilIcon className="size-4" />
+                                </Button>
+                              )}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => removeModel(index)}
+                                aria-label={t('providers.removeModel')}
+                              >
+                                <TrashIcon className="size-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 ) : (

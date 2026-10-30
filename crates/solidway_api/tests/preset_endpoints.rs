@@ -531,7 +531,7 @@ async fn bedrock_anthropic_accepts_aws_credentials() {
     let body = created.json();
     assert_eq!(body["credential_kind"], "aws_sigv4");
     assert_eq!(body["auth_scheme"], "sigv4");
-    assert_eq!(body["credential_masked"], "aws:MPLE");
+    assert_eq!(body["credential_masked"], "aws:AKIA****MPLE");
     assert_eq!(
         body["base_url"],
         "https://bedrock-runtime.us-east-1.amazonaws.com"

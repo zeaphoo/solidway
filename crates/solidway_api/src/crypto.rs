@@ -124,14 +124,18 @@ impl Cipher {
         String::from_utf8(plaintext).map_err(|_| ApiError::internal("明文非 UTF-8"))
     }
 
-    /// 用于展示的掩码，仅保留末 4 位。
+    /// 用于展示的掩码：保留首尾各 4 个字符，便于人工核对是哪一把凭据。
+    /// 总长（含分隔）不足时整体脱敏，不泄露任何字符。
     pub fn mask(token: &str) -> String {
+        const EDGE: usize = 4;
         let chars: Vec<char> = token.chars().collect();
-        if chars.len() <= 4 {
+        // 首尾各 4 且中间至少留 8 个被遮蔽字符，否则整体脱敏。
+        if chars.len() < EDGE * 2 + 8 {
             return "****".to_string();
         }
-        let tail: String = chars[chars.len() - 4..].iter().collect();
-        format!("****{tail}")
+        let head: String = chars[..EDGE].iter().collect();
+        let tail: String = chars[chars.len() - EDGE..].iter().collect();
+        format!("{head}****{tail}")
     }
 
     /// HMAC-SHA256 指纹，用于归因 / 去重，不泄露明文。
@@ -290,8 +294,10 @@ mod tests {
     }
 
     #[test]
-    fn mask_keeps_tail_only() {
-        assert_eq!(Cipher::mask("sk-1234567890abcd"), "****abcd");
+    fn mask_keeps_head_and_tail() {
+        assert_eq!(Cipher::mask("sk-1234567890abcd"), "sk-1****abcd");
+        // 太短：整体脱敏，避免首尾直接拼出原值。
+        assert_eq!(Cipher::mask("sk-short"), "****");
         assert_eq!(Cipher::mask("abc"), "****");
     }
 
