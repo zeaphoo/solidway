@@ -39,3 +39,9 @@
 - 窗口不存在时找回控制台的入口收敛为托盘「以管理员自动登录」（Dock 图标隐藏，macOS 惯例如此）；`Reopen` 兜底仍覆盖 Finder / `open -a` 等系统路径；
 - 隐藏启动（`--hidden`）后第一次进控制台同样走托盘入口——去重与方案 A 的直接推论，已接受；
 - 服务未就绪时点击沿用现状提示，不因本决策改变（范围外，见 `docs/future-roadmap.md`）。
+
+### 2026-10-27 — 「打开控制台」改为始终可用（取代决策 2）
+
+同日随 `app-tray-entry-and-identifier` 推翻决策 2 的置灰口径：托盘「打开控制台」改为**始终可用**，点击时按状态分流（有窗口 → 前置；无窗口有地址 → 重建；无地址 → 按状态页/启动页/失败分流，不覆盖已有失败原因）。
+
+**原因**：Linux 托盘后端（AppIndicator/ksni）的 `MenuItem::set_enabled` 传播不可靠，置灰在真实后端不生效；且置灰把主入口锁死，找回控制台被迫收敛到「以管理员自动登录」，命名与语义都不成立。Dock 图标判据不变（仍只跟随控制台窗口存在性），但与菜单可用性解耦（该入口恒可用）。同 change 另落地 Windows 左键单击打开控制台（`show_menu_on_left_click(false)` + `Click`/`DoubleClick` 双臂幂等）与 Windows 派生网关 `CREATE_NO_WINDOW`。规范见 `desktop-app` spec 的「打开控制台始终可用」「托盘图标的点击行为」；原「打开控制台菜单项可用性」需求已 REMOVED。

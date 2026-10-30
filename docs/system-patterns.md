@@ -87,9 +87,9 @@
 - **桌面偏好**：`<data_root>/desktop.toml`（`autostart` / `close_window_to_tray`）由壳唯一写、启动时物化；`solidway` 只读它来渲染控制台。不变式：文件内容 == 壳实际行为，执行失败不写新值。登录自启在 debug 构建默认关闭、发布构建默认开启；关窗最小化两种构建都默认开启。
 - **控制台编辑链路**：控制台 `/system` → `PUT /api/app/desktop`（admin、desktop 模式）→ 服务发 `solidway: desktop-apply id=… autostart=… close_to_tray=…` → 壳执行 → 壳写 `<data_root>/desktop.status.json` 回执 → 控制台按 `apply_id` 确认/回滚。服务只发事件、不写偏好文件。
 - **托盘兜底**：托盘保留「开机自启动」「关闭窗口时最小化到托盘」两个勾选项，与控制台共用同一执行管线（服务不可用时仍可改）。
-- **托盘可用性与 Dock 重开**：托盘「打开控制台」的启用状态与 Dock 图标存在性同源，均跟随控制台窗口存在性（创建成功恢复可用 + `regular`、销毁置灰 + `accessory`，两时机同步；splash / notice 窗口不计入；恒隐藏 `LSUIElement` 被否）；macOS Dock 点击（`RunEvent::Reopen`，Tauri 里是 macOS-only 变体，处理臂 `cfg` 门控）与托盘「打开控制台」同一打开路径。语义取舍见 `docs/adr/0018-tray-menu-dock-reopen.md`。
+- **托盘可用性与 Dock 重开**：托盘「打开控制台」**始终可用**（点击按状态分流：有窗口前置 / 无窗口重建 / 未就绪走启动页与状态分流，不覆盖已有失败原因；不做置灰——Linux 托盘 `set_enabled` 不可靠且置灰锁死主入口）；Dock 图标存在性单独跟随控制台窗口存在性（`regular` / `accessory`，创建与销毁两时机同步；splash / notice 窗口不计入；恒隐藏 `LSUIElement` 被否）；macOS Dock 点击（`RunEvent::Reopen`，Tauri 里是 macOS-only 变体，处理臂 `cfg` 门控）与托盘「打开控制台」同一打开路径。语义取舍见 `docs/adr/0018-tray-menu-dock-reopen.md`（含 2026-10-27 置灰→始终可用修订）。
 - **自启动与单实例**：登录自启经 `tauri-plugin-autostart`（Linux XDG / macOS LaunchAgent / Windows 当前用户 `Run`）注册，命令固定携带 `--hidden`；`tauri-plugin-single-instance` 保证第二实例在派生 `solidway` 前退出。
-- **托盘点击的平台差异**：`tray-icon` 只在 Windows 派发 `DoubleClick`；macOS 只有左键 `Click`（默认出菜单）；Linux 的 gtk/ksni 后端不派发任何点击事件。因此 Windows 用「双击打开控制台 + 右键菜单」，macOS/Linux 必须以菜单项作为唯一入口，MUST NOT 假设点击事件跨平台可用。
+- **托盘点击的平台差异**：Windows 派发 `Click` / `DoubleClick`（左键单击即打开控制台、不弹菜单，双击同样接受、幂等；右键出菜单）；macOS 只有左键 `Click`（默认出菜单）；Linux 的 gtk/ksni 后端不派发任何点击事件。macOS/Linux 必须以菜单项作为入口，MUST NOT 假设点击事件跨平台可用。
 - **网关二进制落点**：客户端包自带 `solidway`（Linux/Windows 用 `bundle.resources`，mac 用 post-copy 进 `Contents/MacOS`）；壳的查找顺序是「可执行文件同目录 → `resource_dir()` → 开发期 target（仅 debug）→ PATH」，MUST NOT 由壳拼字符串猜打包器布局。Linux 客户端 deb 包名为 `solidway-app`，与服务包 `solidway` 区分。
 - **静默启动**：`--hidden` 下不主动建 splash / 控制台，状态只在托盘；失败路径（含握手超时、端口冲突、子进程退出）仍展示错误页。
 - **桌面免登录**：服务每次 desktop 启动签发进程级令牌（`desktop-login` 事件，壳不落日志），壳把 webview 导航到 `/desktop#<token>` 换 admin 会话；进程内可复用、重启轮换。admin 锁定态拒绝，首启仍走引导设口令。「退出登录」保留（切用户），显式退出清本地令牌；回到 admin 走托盘「以管理员自动登录」。取舍见 `docs/adr/0016-desktop-auto-login.md`。

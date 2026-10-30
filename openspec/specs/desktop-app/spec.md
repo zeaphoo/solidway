@@ -19,7 +19,11 @@ TBD - created by archiving change add-desktop-app. Update Purpose after archive.
 
 应用 SHALL 以**唯一参数 `data_root`** 启动 `solidway` 子进程。
 
-`data_root` MUST 取平台应用数据目录，MUST NOT 依赖应用专属环境变量覆盖。`solidway` 二进制的定位顺序 MUST 为：应用可执行文件同目录 → 开发期工作区构建产物目录 → `PATH`。
+`data_root` MUST 取平台应用数据目录，MUST NOT 依赖应用专属环境变量覆盖。
+
+`solidway` 二进制的定位顺序 MUST 为：应用可执行文件同目录 → 应用资源目录 → 开发期工作区构建产物目录（仅调试构建）→ `PATH`。应用资源目录 MUST 取平台打包器给出的资源目录（Linux deb/rpm 为 `/usr/lib/<产品名>`、AppImage 为 `$APPDIR/usr/lib/<产品名>`、macOS 为 `Contents/Resources`、Windows 为安装目录），MUST NOT 由壳自行按字符串拼接推断。
+
+发布构建的候选列表 MUST NOT 包含开发期工作区路径；定位失败时的错误信息 MUST 只列出真实尝试过的位置。
 
 子进程异常退出后 MUST 按退避策略自动重启；MUST NOT 依赖环境变量开关。子进程的 stdout/stderr MUST 追加写入 `<data_root>/solidway.log`。
 
@@ -27,9 +31,17 @@ TBD - created by archiving change add-desktop-app. Update Purpose after archive.
 - **WHEN** 应用启动且 `data_root` 尚无数据库
 - **THEN** 应用创建目录并启动 `solidway`，由其对数据库执行迁移与 admin 引导
 
+#### Scenario: 客户端包自带网关
+- **WHEN** 用户只安装了桌面客户端（系统 PATH 中没有 `solidway`）
+- **THEN** 应用从应用资源目录找到并启动随包分发的 `solidway`
+
+#### Scenario: 可执行文件同目录优先
+- **WHEN** 应用可执行文件同目录与资源目录同时存在 `solidway`
+- **THEN** 使用同目录的那一份（兼容手工放置与服务包并存）
+
 #### Scenario: 找不到二进制
 - **WHEN** 上述定位顺序均未找到 `solidway`
-- **THEN** 应用 MUST 展示可读错误（含已尝试的路径），SHALL NOT 静默失败
+- **THEN** 应用 MUST 展示可读错误（含已尝试的路径），SHALL NOT 静默失败，且错误中 MUST NOT 出现开发期工作区路径
 
 #### Scenario: 控制台静态托管可用
 - **WHEN** 子进程启动完成且 `web/dist` 位于仓库根或应用可执行文件附近
@@ -203,31 +215,139 @@ macOS 上触发的重开请求（`RunEvent::Reopen`，如点击 Dock 图标、Fi
 - **WHEN** 应用运行在 Linux / Windows
 - **THEN** 不存在 Dock 重开路径，托盘菜单与关窗行为与本需求引入前一致
 
-### Requirement: 打开控制台菜单项可用性
+### Requirement: 打开控制台始终可用
 
-托盘「打开控制台」MUST 跟随控制台窗口存在性更新启用状态：窗口不存在时置灰（保留菜单项、不可点），窗口创建成功后恢复可用，窗口销毁后重新置灰。
+托盘「打开控制台」MUST 始终可用，MUST NOT 因控制台窗口是否存在而改变启用状态，MUST NOT 依赖平台托盘的动态启用能力。
 
-窗口存在性 MUST 以控制台窗口为唯一判据，splash、notice 等瞬态窗口不计入；启用状态 MUST 在窗口创建与销毁两个时机更新。
+点击「打开控制台」MUST 复用统一路径并按下述顺序分流：
 
-置灰语义：窗口不存在时「打开控制台」与「以管理员自动登录」同义（重建窗口并建立 admin 会话），故只保留后者可用，MUST NOT 删除该菜单项。
+- 控制台窗口存在 → MUST 显示并聚焦，MUST NOT 重新导航或刷新页面；
+- 窗口不存在且已有可导航地址 → MUST 重建控制台窗口；
+- 窗口不存在且尚无地址 → MUST 按「打开控制台不覆盖失败原因」分流（启动页 / 状态页 / 失败提示）。
 
-#### Scenario: 窗口不存在时置灰
-- **WHEN** 控制台窗口不存在（尚未创建或已关闭），用户展开托盘菜单
-- **THEN** 「打开控制台」置灰不可点，「以管理员自动登录」可用
+#### Scenario: 窗口不存在时仍可点击
+- **WHEN** 控制台窗口不存在（尚未创建或已关闭），用户点击托盘「打开控制台」
+- **THEN** 应用重建控制台窗口（有地址时直接进入），菜单项全程保持可用
 
-#### Scenario: 窗口重建后恢复可用
-- **WHEN** 通过 Dock 重开或托盘「以管理员自动登录」重建控制台窗口
-- **THEN** 「打开控制台」恢复可用
+#### Scenario: 窗口存在时只前置
+- **WHEN** 控制台窗口已存在，用户点击托盘「打开控制台」
+- **THEN** 窗口显示并聚焦，页面不重新加载
 
-#### Scenario: 窗口销毁后重新置灰
-- **WHEN** 控制台窗口被用户关闭，或因服务重启 / 退出被应用销毁而应用继续运行
-- **THEN** 「打开控制台」重新置灰
+#### Scenario: 未就绪时展示状态页
+- **WHEN** 子进程尚未发出 `listening` 事件，用户点击「打开控制台」
+- **THEN** 按既定分流展示启动页或已有失败原因（不标记为新的失败）
+
+#### Scenario: 不依赖托盘动态启用
+- **WHEN** 应用运行在任何桌面平台（含 Linux AppIndicator 后端）
+- **THEN** 「打开控制台」菜单项始终可点，行为不依赖 `MenuItem::set_enabled` 的传播
+
+### Requirement: 托盘图标的点击行为
+
+在 Windows 上，**左键单击**托盘图标 MUST 打开控制台（复用「打开控制台」同一路径）；左键单击 MUST NOT 弹出菜单，右键 MUST 弹出菜单；双击 MAY 同样打开（该路径幂等：窗口已存在则只前置）。
+
+macOS 与 Linux MUST NOT 因本需求改变左键行为：macOS 保持左键弹出菜单；Linux 托盘后端（AppIndicator / ksni）不派发点击事件，打开控制台 MUST 依赖菜单项。
+
+#### Scenario: Windows 单击打开控制台
+- **WHEN** 用户在 Windows 上左键单击托盘图标
+- **THEN** 控制台窗口被打开（已存在则前置并聚焦），页面不重新加载，且不弹出菜单
+
+#### Scenario: Windows 右键菜单
+- **WHEN** 用户在 Windows 上右键单击托盘图标
+- **THEN** 弹出托盘菜单
+
+#### Scenario: Windows 双击不产生额外副作用
+- **WHEN** 用户快速双击托盘图标
+- **THEN** 控制台窗口仍只有一个，前台可见，不重复创建窗口
+
+#### Scenario: macOS 保持菜单习惯
+- **WHEN** 用户在 macOS 上左键单击托盘图标
+- **THEN** 弹出菜单（与改动前一致）
+
+#### Scenario: Linux 只走菜单
+- **WHEN** 用户在 Linux 上点击托盘图标
+- **THEN** 弹出菜单；打开控制台通过菜单项完成（后端不派发点击事件）
+
+### Requirement: 托管子进程不显示控制台窗口
+
+Windows 上应用派生子进程时 MUST 使用不创建控制台窗口的派生方式（如 `CREATE_NO_WINDOW`）；MUST NOT 通过把网关改成 GUI 子系统来隐藏窗口——网关独立运行（命令行 / 服务）时 MUST 保持控制台子系统，stdout 事件对调用方可见。
+
+#### Scenario: 桌面启动无黑窗
+- **WHEN** 用户从桌面应用启动 Solidway（含开机自启）
+- **THEN** 不出现任何控制台窗口，只有托盘图标与（按需的）控制台界面
+
+#### Scenario: 独立运行仍有输出
+- **WHEN** 用户在命令行直接运行 `solidway.exe <data_root> --mode standalone`
+- **THEN** `solidway: listening …`、`bootstrap …` 等事件照常打印在终端
+
+### Requirement: 启动失败的呈递
+
+应用在启动失败时 MUST 按失败分类向用户呈现三段内容：**结论标题**、**可执行的建议**、**日志末尾**；MUST NOT 只呈现技术错误串。
+
+分类与建议 MUST 至少覆盖：
+
+- 找不到 `solidway` 可执行文件 → 提示「安装可能不完整」，并说明应重新下载/安装；
+- 找到但无法执行（缺权限、架构或依赖不符）→ 提示需重新安装或改用匹配的安装包；
+- 端口被占用 → 展示占用者（comm，pid 可读时一并展示），并提示关闭占用程序后重试；占用者为另一个 `solidway` 时 MUST 说明可能是上次未正常退出；
+- 端口无权限（`permission-denied`）→ 提示改用 1024 以上端口或调整运行权限；
+- 子进程异常退出 / 握手超时 → 展示失败原因与日志末尾。
+
+日志末尾 MUST 取 `<data_root>/solidway.log` 的最后若干行，去除 ANSI 控制序列并限制长度；日志不存在时 MUST 省略该段，MUST NOT 显示为空白的代码块。
+
+应用 MUST NOT 因端口冲突自动结束其他进程，MUST NOT 自动更换监听端口。
+
+#### Scenario: 安装不完整
+- **WHEN** 应用在可执行文件同目录、应用资源目录、开发期目录与 `PATH` 中都找不到 `solidway`
+- **THEN** 错误页标题为「安装可能不完整」，建议中包含重新下载/安装的指引，并保留已尝试路径供技术排查
+
+#### Scenario: 程序不可执行
+- **WHEN** 找到 `solidway` 但系统以权限不足或其他非「不存在」原因拒绝启动
+- **THEN** 错误页提示需重新安装或检查权限/架构，不误导用户去重新下载
+
+#### Scenario: 端口被占用
+- **WHEN** 服务端发出 `bind-failed` 且 `kind` 非 `permission-denied`
+- **THEN** 错误页说明端口已被占用、展示占用者信息、建议关闭占用程序后重试，且附日志末尾
+
+#### Scenario: 端口无权限
+- **WHEN** `bind-failed` 的 `kind` 为 `permission-denied`
+- **THEN** 错误页提示改用 1024 以上的端口或调整运行权限
+
+#### Scenario: 异常退出带日志
+- **WHEN** 子进程异常退出或握手超时
+- **THEN** 错误页展示退出原因，并内嵌日志最后 20 行（已去除 ANSI 颜色码）
+
+#### Scenario: 无日志时不显示空块
+- **WHEN** `<data_root>/solidway.log` 不存在或为空
+- **THEN** 错误页不渲染日志区域，只显示标题与建议
+
+### Requirement: 打开控制台不覆盖失败原因
+
+所有复用「打开控制台」路径的入口（托盘菜单、Dock 重开、运行态自动开窗）在**没有可导航地址**时 MUST 按当前状态分流，MUST NOT 用通用提示覆盖已记录的失败原因：
+
+- 子进程仍在握手（启动中）→ MUST 只把启动页带到前台，MUST NOT 标记为失败；
+- 已失败或已停止且存在原因 → MUST 把状态页带到前台，并在状态页保留该原因文本；
+- 既无地址也无原因 → 才可标记失败，且提示 MUST 包含子进程日志路径。
+
+#### Scenario: 启动中点击打开控制台
+- **WHEN** 子进程已启动但尚未收到 `listening` 事件，用户点击「打开控制台」
+- **THEN** 应用展示启动页，状态保持启动中，不标记失败
+
+#### Scenario: 端口冲突后点击打开控制台
+- **WHEN** 子进程因端口被占用退出（已展示端口冲突原因），用户点击「打开控制台」
+- **THEN** 状态页仍展示端口冲突原因（含占用者 pid / 进程名），不被通用提示覆盖
+
+#### Scenario: 找不到二进制后点击打开控制台
+- **WHEN** 子进程因「未找到 solidway 可执行文件」未能启动，用户点击「打开控制台」
+- **THEN** 状态页仍展示该错误与已尝试路径，不被通用提示覆盖
+
+#### Scenario: 无原因时提示含日志路径
+- **WHEN** 既没有可导航地址也没有任何已记录原因，用户点击「打开控制台」
+- **THEN** 应用标记失败，且提示中包含 `<data_root>/solidway.log` 的完整路径
 
 ### Requirement: Dock 图标存在性
 
 Dock 图标 SHALL 跟随控制台窗口存在性显隐（macOS activation policy）：控制台窗口存在时以 `regular` 形态运行（Dock 图标可见）；不存在时（关进托盘、`--hidden` 启动未开窗）以 `accessory` 形态运行（Dock 图标隐藏），应用与托盘继续运行。
 
-判据与「打开控制台菜单项可用性」同源：仅控制台主窗口计入，splash、notice 等瞬态窗口不计入。MUST NOT 采用恒隐藏形态（`LSUIElement`）：窗口存在时 Dock 图标 MUST 可见。
+判据为控制台主窗口存在性：仅控制台主窗口计入，splash、notice 等瞬态窗口不计入；托盘「打开控制台」的可用性不参与该判据（该入口恒可用）。MUST NOT 采用恒隐藏形态（`LSUIElement`）：窗口存在时 Dock 图标 MUST 可见。
 
 显隐切换 MUST 在窗口创建与销毁两个时机执行；隐藏 Dock 图标 MUST NOT 影响托盘图标与已展示窗口的可见性。其他平台 MUST NOT 因本需求产生任何行为变化。
 
