@@ -78,9 +78,28 @@ trap cleanup EXIT
 
 # 资源注入用 --config 临时文件（与 Linux 脚本一致）：把 solidway.exe 打进安装目录。
 INJECT_CONFIG="$ROOT/app/.bundle-resources.json"
+# MSI（WiX）的 ProductVersion 只能是数字 `major.minor.patch[.build]`，Tauri 会直接拒绝非数字
+# 预发布标识符（如 `0.5.0-rc.1`）。这里把预发布里第一个数字映射到 build 段：
+# `0.5.0-rc.1` → `0.5.0.1`；无数字标识符时用 1；正式版不注入，交给 Tauri 自己推导。
+msi_version=""
+if [[ "$version" == *-* ]]; then
+    core="${version%%-*}"
+    pre="${version#*-}"
+    build=1
+    if [[ "$pre" =~ [0-9]+ ]]; then
+        build="$((10#${BASH_REMATCH[0]}))"
+    fi
+    (( build > 65535 )) && build=65535
+    msi_version="${core}.${build}"
+fi
 # 绝对路径 + Windows 形式（bundler 不解析相对路径，也不认 MSYS 的 /d/... 路径）。
-node -e 'const fs=require("fs");fs.writeFileSync(process.argv[2], JSON.stringify({bundle:{resources:{[process.argv[1]]:"solidway.exe"}}}))' \
-    "$(cygpath -w "$ROOT/app/solidway.exe")" "$(cygpath -w "$INJECT_CONFIG")"
+node -e '
+const fs = require("fs")
+const [exe, out, msi] = process.argv.slice(1)
+const config = { bundle: { resources: { [exe]: "solidway.exe" } } }
+if (msi) config.bundle.windows = { wix: { version: msi } }
+fs.writeFileSync(out, JSON.stringify(config))
+' "$(cygpath -w "$ROOT/app/solidway.exe")" "$(cygpath -w "$INJECT_CONFIG")" "$msi_version"
 (cd "$ROOT/app" && cargo tauri build --config "$(cygpath -w "$INJECT_CONFIG")" --bundles "$BUNDLES")
 rm -f "$INJECT_CONFIG"
 APP_TARGET="$(target_dir "$ROOT/app")"

@@ -31,6 +31,7 @@
 - **Provider 凭据掩码**：由「仅末 4 位」改为「首尾各 4 位」，并在读取时按当前规则从密文重算，存量记录无需重新保存；编辑弹窗以 placeholder 直接显示当前掩码。
 - **模型清单**：默认只显示一个模型 id，需要对外改名时才展开「上游 id / 对外名称」两列；重新获取模型按上游 id 合并去重并恢复上游列表顺序，改名行不再重复插入。
 - **打包**：`v*` 发布时 RPM 构建因 semver 预发布 `-`（RPM `Version` 不允许）失败，现将 `-` 映射为 `~`（`0.5.0-rc.1` → `0.5.0~rc.1`），deb / rpm 排序均低于同号正式版。
+- **Windows MSI**：WiX 的 `ProductVersion` 只接受数字，非数字预发布标识符（`rc.1`）会让 msi 打包失败；现由 `scripts/package-windows.sh` 把预发布里的数字映射到 build 段（`0.5.0-rc.1` → `0.5.0.1`），产物文件名仍为 `0.5.0-rc.1`。
 - **macOS 分发**：dmg 安装盘布局（Applications 链接与图标定位）、Developer ID 签名 + Apple 公证双钉票、Gatekeeper 验收。
 
 [Unreleased]: https://github.com/zeaphoo/solidway/compare/v0.5.0-rc.1...HEAD
