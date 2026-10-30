@@ -3,6 +3,7 @@
 use serde_json::{Map, Value, json};
 
 use crate::common::empty;
+use crate::common::usage::{positive, saturating_sum};
 use crate::registry::{Plan, Transcoded};
 use crate::report::{Error, Report, Side, WarningCode};
 use crate::wire::anthropic::{AnthropicError, AnthropicResponse};
@@ -193,26 +194,22 @@ pub(super) fn convert(body: &[u8], plan: &Plan) -> Result<Transcoded<Vec<u8>>, E
     let usage = resp.usage.as_ref().map(|usage| {
         let cache_read = usage.cache_read_input_tokens.unwrap_or(0);
         let cache_creation = usage.cache_creation_input_tokens.unwrap_or(0);
-        let prompt = usage.input_tokens.unwrap_or(0) + cache_read + cache_creation;
+        let prompt = saturating_sum(&[usage.input_tokens, Some(cache_read), Some(cache_creation)]);
         let completion = usage.output_tokens.unwrap_or(0);
         ChatUsage {
             prompt_tokens: Some(prompt),
             completion_tokens: Some(completion),
-            total_tokens: Some(prompt + completion),
-            prompt_tokens_details: if cache_read > 0 {
-                Some(ChatTokenDetails {
-                    cached_tokens: Some(cache_read),
-                    audio_tokens: None,
-                    cache_creation_tokens: None,
-                    cache_write_tokens: None,
-                    reasoning_tokens: None,
-                    accepted_prediction_tokens: None,
-                    rejected_prediction_tokens: None,
-                    extra: Map::new(),
-                })
-            } else {
-                None
-            },
+            total_tokens: Some(saturating_sum(&[Some(prompt), Some(completion)])),
+            prompt_tokens_details: positive(cache_read).map(|cache_read| ChatTokenDetails {
+                cached_tokens: Some(cache_read),
+                audio_tokens: None,
+                cache_creation_tokens: None,
+                cache_write_tokens: None,
+                reasoning_tokens: None,
+                accepted_prediction_tokens: None,
+                rejected_prediction_tokens: None,
+                extra: Map::new(),
+            }),
             completion_tokens_details: None,
             extra: Map::new(),
         }

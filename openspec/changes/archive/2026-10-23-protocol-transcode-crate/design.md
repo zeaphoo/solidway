@@ -472,7 +472,12 @@ crates/solidway_transcode/
 │   ├── registry.rs                  # 静态方向表 + StreamTranslator（方言组合待实现）
 │   ├── common/
 │   │   ├── mod.rs
-│   │   └── frame.rs                 # FrameDecoder / FrameEncoder（SSE）
+│   │   ├── empty.rs                 # 空响应合成
+│   │   ├── frame.rs                 # FrameDecoder / FrameEncoder（SSE）
+│   │   ├── json.rs                  # JSON Pointer 解析（RFC 6901）
+│   │   ├── model.rs                 # 模型名分类 / 通用阈值
+│   │   ├── schema.rs                # JSON Schema 归一化（root union / $ref）
+│   │   └── usage.rs                 # Option<u64> 饱和算术
 │   ├── wire/
 │   │   ├── mod.rs
 │   │   ├── openai_chat/{mod.rs,types.rs,request.rs,response.rs,stream.rs,error.rs}

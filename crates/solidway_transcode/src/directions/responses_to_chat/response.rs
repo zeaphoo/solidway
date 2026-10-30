@@ -3,6 +3,7 @@
 use serde_json::{Map, Value};
 
 use crate::common::empty;
+use crate::common::usage::saturating_sum;
 use crate::registry::{Plan, ResponseContext, Transcoded};
 use crate::report::{Error, Report, Side, WarningCode};
 use crate::wire::openai_chat::{ChatContent, ChatError, ChatResponse};
@@ -400,7 +401,10 @@ pub(super) fn convert(
             input_tokens: usage.prompt_tokens,
             output_tokens: usage.completion_tokens,
             total_tokens: usage.total_tokens.or_else(|| {
-                Some(usage.prompt_tokens.unwrap_or(0) + usage.completion_tokens.unwrap_or(0))
+                Some(saturating_sum(&[
+                    usage.prompt_tokens,
+                    usage.completion_tokens,
+                ]))
             }),
             cache_creation_input_tokens: prompt
                 .and_then(|details| details.cache_creation_tokens.or(details.cache_write_tokens)),

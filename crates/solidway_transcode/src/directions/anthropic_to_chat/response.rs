@@ -3,6 +3,7 @@
 use serde_json::{Map, Value, json};
 
 use crate::common::empty;
+use crate::common::usage::{positive, saturating_deduct};
 use crate::registry::{Plan, Transcoded};
 use crate::report::{Error, Report, Side, WarningCode};
 use crate::wire::anthropic::{
@@ -367,16 +368,12 @@ pub(super) fn convert(body: &[u8], plan: &Plan) -> Result<Transcoded<Vec<u8>>, E
             .as_ref()
             .and_then(|details| details.cache_write_tokens.or(details.cache_creation_tokens))
             .unwrap_or(0);
-        let input = usage
-            .prompt_tokens
-            .unwrap_or(0)
-            .saturating_sub(cached)
-            .saturating_sub(cache_creation);
+        let input = saturating_deduct(usage.prompt_tokens, &[Some(cached), Some(cache_creation)]);
         AnthropicUsage {
             input_tokens: Some(input),
             output_tokens: usage.completion_tokens,
-            cache_creation_input_tokens: (cache_creation > 0).then_some(cache_creation),
-            cache_read_input_tokens: (cached > 0).then_some(cached),
+            cache_creation_input_tokens: positive(cache_creation),
+            cache_read_input_tokens: positive(cached),
             service_tier: resp.service_tier.clone(),
             cache_creation: None,
             server_tool_use: None,

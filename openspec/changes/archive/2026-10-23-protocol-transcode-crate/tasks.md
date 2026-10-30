@@ -16,6 +16,7 @@
 > 2026-10-23 继续对齐（二）：Chat→Responses 角色/stream/store/include、legacy function ID、未知 item 文本保留；
 > 2026-10-23 继续对齐：thinking 落点/默认 effort、text-only user content 折叠、reasoning summary-only、agent 消息、legacy function 配对、流式 thinking signature、zero detail / x_search choice。
 > 2026-10-23 sub2api 功能对照：补齐温度剥离、输出下限、tool_result 媒体、未声明 tool_choice、thinking disabled、reasoning-only fallback、developer→system、custom/namespace/tool_search/built-in tools、流式晚到 name / 空 args、id/空 choices、usage 明细与 refusal、billing header、Read 空 pages、namespace 还原、response context、server tool 形状、空 body 合成、Claude Code metadata 默认值；剩余项见 design §22。
+> 2026-10-30 收尾（补 2.4）：新增 `common/json.rs`（RFC 6901 指针解析，`$ref` 与方向层共用）与 `common/usage.rs`（`Option<u64>` 饱和算术）；把散在 6 个方向的 9 处 `unwrap_or(0) +` 收拢为饱和求和（修掉 `u64::MAX` 计费字段在 debug 下溢出 panic），4 份重复的缓存扣减 / `>0` 归一合并为 `saturating_deduct` / `positive`。`common/ids.rs` 不做，理由见 §10.6。
 > 方向语义：`src` = 客户端格式，`dst` = 上游协议；`request` 走 `src → dst`，`response` / `stream` 走 `dst → src`。
 
 ## 1. 骨架与边界
@@ -30,7 +31,9 @@
 - [x] 2.1 `protocol.rs`：`ProtocolId` / `WireKind` / `Support` / `DirectionCaps` / `RequestCaps` / `ResponseCaps` / `StreamCaps`
 - [x] 2.2 `report.rs`：`Report` / `Warning` / `WarningCode` / `Side` / `TranscodePolicy`
 - [x] 2.3 `common/frame.rs`：`FrameDecoder` / `FrameEncoder`（SSE 与 AWS eventstream），覆盖半帧、多行 data、`[DONE]`、截断
-- [ ] 2.4 `common/json.rs` / `common/ids.rs` / `common/usage.rs`：JSON Pointer、id 前缀、`Option<u64>` 算术
+- [x] 2.4 `common/json.rs` / `common/usage.rs`：JSON Pointer（`#/a/b/0` 解析、`~0`/`~1` 按 RFC 6901 顺序反转义，供 `$ref` 展开与方向层共用）、`Option<u64>` 算术（缺失计 0，逐项饱和：`saturating_deduct` / `saturating_sum` / `positive`）
+  - `common/ids.rs` 不做：id 前缀判定（`data:`、`anthropic-thinking-v1:`、legacy function id、`chatcmpl_*` 兜底）全部绑定协议字段名与线上形状，放进 `common` 会违反 2.5；已登记 §10.6
+  - 语义边界：`None` 与 `0` 在运算上等价（按 0 参与），是否下发 `Some(0)` 由调用方用 `positive` 决定；`None` 与 `0` 的区分在跨协议转换中仍会丢失，属 `KNOWN_LOSSY`，本 change 不改写线上形状
 - [x] 2.5 `common` 不得出现协议名、字段名或跨协议判断；单元测试覆盖上述工具
 
 ## 3. wire 类型
@@ -99,7 +102,7 @@
 - [x] 9.2 conformance：caps × 方向（自洽 + 组合收窄）、`MUST_PRESERVE` 覆盖、`KNOWN_LOSSY` warning 覆盖
 - [x] 9.3 `proptest` 或等价 no-panic 用例（不 panic、返回 `Error::Invalid`）
 - [x] 9.4 确定性：同一输入重复转换，输出字节 / 帧序列一致
-- [x] 9.5 隔离守卫：`tests/isolation.rs` + `scripts/check-transcode-isolation.sh`；删除任一方向目录验证其余方向仍通过
+- [x] 9.5 隔离守卫：`tests/isolation.rs`（方向间零引用 + `common` 无协议语义）；~~`scripts/check-transcode-isolation.sh`~~ 未落地，按 design §631 的「或」分支由测试覆盖；删除任一方向目录验证其余方向仍通过
 - [x] 9.6 `cargo test -p solidway-transcode` 与 `cargo build --workspace` 通过，测试不联网
 - [x] 9.7 性能预算：10KB 请求转换 < 1ms（release；debug 放宽），记录基准
 - [x] 9.8 设计复查：输出「是否接入 core」的结论；接入另立 change + ADR
@@ -111,3 +114,4 @@
 - [x] 10.3 不修改 `ApiFormat` / `ProviderEntry` / 转发白名单 / 数据库
 - [x] 10.4 不修改 `openspec/specs/`（本 change 无 spec delta）
 - [x] 10.5 不做 token 估算、`/v1/models`、文件上传、Batch、Realtime、Embeddings、Images、Audio 生成
+- [x] 10.6 不建 `common/ids.rs`：id 前缀是协议字面量（`data:` / `anthropic-thinking-v1:` / legacy function id），集中在 `common` 会把协议字段名带进机械层，违反 2.5；前缀判定留在各方向

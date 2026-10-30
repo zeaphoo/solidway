@@ -3,6 +3,7 @@
 use serde_json::{Value, json};
 
 use crate::common::frame::OutFrame;
+use crate::common::usage::saturating_sum;
 use crate::report::{Error, Side, WarningCode};
 use crate::wire::openai_chat::ChatUsage;
 
@@ -526,7 +527,7 @@ fn chat_usage_to_responses(usage: &ChatUsage) -> Value {
     json!({
         "input_tokens": usage.prompt_tokens,
         "output_tokens": usage.completion_tokens,
-        "total_tokens": usage.total_tokens.or_else(|| Some(usage.prompt_tokens.unwrap_or(0) + usage.completion_tokens.unwrap_or(0))),
+        "total_tokens": usage.total_tokens.or_else(|| Some(saturating_sum(&[usage.prompt_tokens, usage.completion_tokens]))),
         "input_tokens_details": cached.map(|cached| json!({"cached_tokens": cached})),
         "output_tokens_details": reasoning.map(|reasoning| json!({"reasoning_tokens": reasoning}))
     })

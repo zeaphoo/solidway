@@ -2,5 +2,7 @@
 
 pub(crate) mod empty;
 pub(crate) mod frame;
+pub(crate) mod json;
 pub(crate) mod model;
 pub(crate) mod schema;
+pub(crate) mod usage;

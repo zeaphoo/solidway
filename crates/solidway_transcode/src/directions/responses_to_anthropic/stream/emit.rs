@@ -3,6 +3,7 @@
 use serde_json::{Value, json};
 
 use crate::common::frame::OutFrame;
+use crate::common::usage::{positive, saturating_sum};
 use crate::report::{Error, Side, WarningCode};
 use crate::wire::anthropic::{AnthropicContentBlock, AnthropicUsage};
 
@@ -549,13 +550,13 @@ fn server_tool_action(input: &str) -> Value {
 fn anthropic_usage_to_responses(usage: &AnthropicUsage) -> Value {
     let cache_read = usage.cache_read_input_tokens.unwrap_or(0);
     let cache_creation = usage.cache_creation_input_tokens.unwrap_or(0);
-    let input = usage.input_tokens.unwrap_or(0) + cache_read + cache_creation;
+    let input = saturating_sum(&[usage.input_tokens, Some(cache_read), Some(cache_creation)]);
     let output = usage.output_tokens.unwrap_or(0);
     json!({
         "input_tokens": input,
         "output_tokens": output,
-        "total_tokens": input + output,
-        "cache_creation_input_tokens": (cache_creation > 0).then_some(cache_creation),
-        "input_tokens_details": (cache_read > 0).then_some(json!({"cached_tokens": cache_read}))
+        "total_tokens": saturating_sum(&[Some(input), Some(output)]),
+        "cache_creation_input_tokens": positive(cache_creation),
+        "input_tokens_details": positive(cache_read).map(|cache_read| json!({"cached_tokens": cache_read}))
     })
 }

@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use serde_json::{Map, Value, json};
 
 use crate::common::empty;
+use crate::common::usage::{positive, saturating_sum};
 use crate::registry::{Plan, Transcoded};
 use crate::report::{Error, Report, Side, WarningCode};
 use crate::wire::anthropic::{
@@ -235,16 +236,18 @@ pub(super) fn convert(body: &[u8], plan: &Plan) -> Result<Transcoded<Vec<u8>>, E
     let usage = resp.usage.as_ref().map(|usage| {
         let cache_read = usage.cache_read_input_tokens.unwrap_or(0);
         let cache_creation = usage.cache_creation_input_tokens.unwrap_or(0);
-        let input = usage.input_tokens.unwrap_or(0) + cache_read + cache_creation;
+        let input = saturating_sum(&[usage.input_tokens, Some(cache_read), Some(cache_creation)]);
         let output = usage.output_tokens.unwrap_or(0);
         ResponsesUsage {
             input_tokens: Some(input),
             output_tokens: Some(output),
-            total_tokens: Some(input + output),
-            cache_creation_input_tokens: (cache_creation > 0).then_some(cache_creation),
-            input_tokens_details: (cache_read > 0).then_some(ResponsesInputTokensDetails {
-                cached_tokens: Some(cache_read),
-                ..empty_input_details()
+            total_tokens: Some(saturating_sum(&[Some(input), Some(output)])),
+            cache_creation_input_tokens: positive(cache_creation),
+            input_tokens_details: positive(cache_read).map(|cache_read| {
+                ResponsesInputTokensDetails {
+                    cached_tokens: Some(cache_read),
+                    ..empty_input_details()
+                }
             }),
             output_tokens_details: None,
             extra: Map::new(),

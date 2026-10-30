@@ -3,6 +3,7 @@
 use serde_json::{Map, Value};
 
 use crate::common::empty;
+use crate::common::usage::saturating_sum;
 use crate::registry::{Plan, Transcoded};
 use crate::report::{Error, Report, Side, WarningCode};
 use crate::wire::openai_chat::{
@@ -298,7 +299,7 @@ pub(super) fn convert(body: &[u8], plan: &Plan) -> Result<Transcoded<Vec<u8>>, E
         completion_tokens: usage.output_tokens,
         total_tokens: usage
             .total_tokens
-            .or_else(|| Some(usage.input_tokens.unwrap_or(0) + usage.output_tokens.unwrap_or(0))),
+            .or_else(|| Some(saturating_sum(&[usage.input_tokens, usage.output_tokens]))),
         prompt_tokens_details: usage.input_tokens_details.as_ref().and_then(|details| {
             let mapped = ChatTokenDetails {
                 cached_tokens: details.cached_tokens.filter(|value| *value > 0),

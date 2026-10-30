@@ -5,6 +5,8 @@ use std::hash::{Hash, Hasher};
 
 use serde_json::{Map, Value, json};
 
+use super::json::resolve_local;
+
 pub(crate) fn normalize_object_schema(schema: Option<&Value>) -> Value {
     let Some(schema) = schema else {
         return empty_object_schema();
@@ -69,7 +71,7 @@ fn expand_refs(value: &Value, root: &Value, seen: &mut HashSet<String>, depth: u
                 if seen.contains(reference) {
                     return json!({});
                 }
-                let Some(resolved) = resolve_pointer(root, reference) else {
+                let Some(resolved) = resolve_local(root, reference) else {
                     return json!({});
                 };
                 seen.insert(reference.to_string());
@@ -103,20 +105,6 @@ fn expand_refs(value: &Value, root: &Value, seen: &mut HashSet<String>, depth: u
         ),
         other => other.clone(),
     }
-}
-
-fn resolve_pointer(root: &Value, reference: &str) -> Option<Value> {
-    let pointer = reference.strip_prefix("#/")?;
-    let mut current = root;
-    for token in pointer.split('/') {
-        let token = token.replace("~1", "/").replace("~0", "~");
-        current = match current {
-            Value::Object(object) => object.get(&token)?,
-            Value::Array(items) => items.get(token.parse::<usize>().ok()?)?,
-            _ => return None,
-        };
-    }
-    Some(current.clone())
 }
 
 fn flatten_root_unions(object: &mut Map<String, Value>) {

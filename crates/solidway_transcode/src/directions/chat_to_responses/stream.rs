@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use serde_json::Map;
 
 use crate::common::frame::{InFrame, OutFrame};
+use crate::common::usage::saturating_sum;
 use crate::registry::{Plan, StreamBridge};
 use crate::report::{Error, Report, Side, WarningCode};
 use crate::wire::openai_chat::{
@@ -558,7 +559,7 @@ fn responses_usage_to_chat(usage: &ResponsesUsage) -> ChatUsage {
         completion_tokens: usage.output_tokens,
         total_tokens: usage
             .total_tokens
-            .or_else(|| Some(usage.input_tokens.unwrap_or(0) + usage.output_tokens.unwrap_or(0))),
+            .or_else(|| Some(saturating_sum(&[usage.input_tokens, usage.output_tokens]))),
         prompt_tokens_details: cached.map(|cached| ChatTokenDetails {
             cached_tokens: Some(cached),
             ..empty_details()
