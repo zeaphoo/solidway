@@ -6,16 +6,17 @@
 
 | 平台 | 产物 | 构建脚本 |
 |---|---|---|
-| Linux 服务 | `solidway_<ver>-1_<arch>.deb`、`solidway-<ver>-1.<arch>.rpm`（systemd） | `scripts/package-linux.sh` |
-| Linux 客户端 | `solidway-app_<ver>_<arch>.deb`、`solidway-app_<ver>_<arch>.AppImage`（均自带网关） | `scripts/package-linux-app.sh` |
-| Windows 客户端 | `solidway-app_<ver>_x64-setup.exe`（NSIS，中英双语）、`solidway-app_<ver>_x64_<locale>.msi`、`solidway-app_<ver>_x64_portable.zip` | `scripts/package-windows.sh` |
-| macOS 客户端 | `solidway-app_<ver>_<arch>.dmg`（x86_64 / arm64 各一份，已公证） | `scripts/package-mac.sh` + `scripts/notarize-mac.sh` |
+| Linux 服务 | `solidway_<ver>-1_linux_<arch>.deb`、`solidway-<ver>-1.linux.<arch>.rpm`（systemd） | `scripts/package-linux.sh` |
+| Linux 客户端 | `solidway-app_<ver>_linux_<arch>.deb`、`solidway-app_<ver>_linux_<arch>.AppImage`（均自带网关） | `scripts/package-linux-app.sh` |
+| Windows 客户端 | `solidway-app_<ver>_windows_x64-setup.exe`（NSIS，中英双语）、`solidway-app_<ver>_windows_x64_<locale>.msi`、`solidway-app_<ver>_windows_x64_portable.zip` | `scripts/package-windows.sh` |
+| macOS 客户端 | `solidway-app_<ver>_macos_<arch>.dmg`（x86_64 / arm64 各一份，已公证） | `scripts/package-mac.sh` + `scripts/notarize-mac.sh` |
 
-命名约定：**客户端产物统一 `solidway-app_<ver>_<arch>[.<ext>]`**，服务包统一 `solidway_<ver>-<rev>_<arch>`；
-架构名按平台惯例（Linux `amd64`/`arm64`、Windows `x64`、macOS `x86_64`/`arm64`）。
+命名约定：**客户端产物统一 `solidway-app_<ver>_<os>_<arch>[.<ext>]`**，服务包统一 `solidway_<ver>-<rev>_<os>_<arch>`；
+`<os>` 取 `linux` / `windows` / `macos`，架构名按平台惯例（Linux `amd64`/`arm64`、Windows `x64`、macOS `x86_64`/`arm64`）。
+OS 标记是为了在 Release 资产列表里一眼辨认平台（下载页只有文件名可看）。
 
 **预发布版本写法**：清单里的 semver 必须带连字符（如 `0.5.0-rc.1`，Cargo/Tauri 拒绝 `0.5.0rc1`），
-而 deb / rpm 的版本字段用 `~` 表达预发布（`solidway_0.5.0~rc.1-1_amd64.deb`、`solidway-0.5.0~rc.1-1.x86_64.rpm`），
+而 deb / rpm 的版本字段用 `~` 表达预发布（`solidway_0.5.0~rc.1-1_linux_amd64.deb`、`solidway-0.5.0~rc.1-1.linux.x86_64.rpm`），
 排序仍低于同号正式版：`cargo-deb` 自动转换，rpm 由 `scripts/package-linux.sh` 显式映射（RPM 的 `Version` 不允许 `-`）。
 **Windows MSI** 的 `ProductVersion` 同样只接受数字（`major.minor.patch[.build]`），`scripts/package-windows.sh`
 把预发布里的第一个数字映射到 build 段（`0.5.0-rc.1` → `0.5.0.1`），文件名与 NSIS / dmg / deb / rpm 仍是 `0.5.0-rc.1`。
@@ -94,8 +95,12 @@ solidway-<version>-1.<arch>.rpm
 ```
 
 脚本会先构建 `web/dist`，再执行 `cargo build --release -p solidway`。
-二进制动态链接 glibc，建议在**目标发行版或目标最低版本**的构建机上打包，
-避免 GLIBC 版本不兼容。
+二进制动态链接 glibc，因此构建机版本决定了产物的 **glibc 下限**。
+
+发布流水线的 Linux job 固定使用 `runs-on: ubuntu-24.04`（glibc 2.39），**不使用 `ubuntu-latest`**：
+`-latest` 会随 GitHub 迁移到 Ubuntu 26 而抬升 glibc 下限，导致旧发行版用户装不上。
+要兼容更老的发行版，就显式把该 runner 换成目标基线（注意 Tauri v2 需要 `libwebkit2gtk-4.1-dev`，
+过于老旧的镜像可能没有该包）。
 
 如果前端已构建，可跳过：
 
@@ -106,9 +111,9 @@ SKIP_WEB_BUILD=1 ./scripts/package-linux.sh
 ## 安装
 
 ```bash
-sudo apt install ./solidway_0.1.0-1_amd64.deb
+sudo apt install ./solidway_0.5.0~rc.1-1_linux_amd64.deb
 # 或
-sudo rpm -ivh solidway-0.1.0-1.x86_64.rpm
+sudo rpm -ivh solidway-0.5.0~rc.1-1.linux.x86_64.rpm
 ```
 
 安装脚本会创建 `solidway` 用户、初始化 `/var/lib/solidway`、启用并启动服务。

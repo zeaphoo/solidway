@@ -178,7 +178,7 @@ WebView2
   AGPL-3.0-only — https://github.com/zeaphoo/solidway/blob/main/LICENSE
 TXT
 
-ZIP="$DIST_DIR/solidway-app_${version}_x64_portable.zip"
+ZIP="$DIST_DIR/solidway-app_${version}_windows_x64_portable.zip"
 PORTABLE_WIN="$(cygpath -w "$DIST_DIR/portable")"
 ZIP_WIN="$(cygpath -w "$ZIP")"
 powershell.exe -NoProfile -NonInteractive -Command \
@@ -195,12 +195,12 @@ fi
 # 客户端产物统一前缀 solidway-app_（bundler 默认用 productName 命名）。
 for file in "${installers[@]}"; do
     case "$file" in
-        *.exe) out="solidway-app_${version}_x64-setup.exe" ;;
+        *.exe) out="solidway-app_${version}_windows_x64-setup.exe" ;;
         *.msi)
             # WiX 按 wix.language 每个语言出一个 MSI（Solidway_<ver>_x64_en-US.msi），
             # 保留语言后缀，避免多语言产物互相覆盖。
             locale="${file##*_}"
-            out="solidway-app_${version}_x64_${locale}"
+            out="solidway-app_${version}_windows_x64_${locale}"
             ;;
         *)     out="$(basename "$file")" ;;
     esac

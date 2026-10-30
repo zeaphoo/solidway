@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 构建 macOS 桌面应用：Solidway.app + solidway-app_<version>_<arch>.dmg。
+# 构建 macOS 桌面应用：Solidway.app + solidway-app_<version>_macos_<arch>.dmg。
 #
 # 依赖：cargo、pnpm、tauri-cli、codesign、hdiutil、security。
 # 可用环境变量：
@@ -242,7 +242,7 @@ if ! verify_output="$(codesign --verify --deep --strict "$APP" 2>&1 </dev/null)"
 fi
 
 ARCH="$(uname -m)"
-DMG="$DIST_DIR/solidway-app_${conf_version}_${ARCH}.dmg"
+DMG="$DIST_DIR/solidway-app_${conf_version}_macos_${ARCH}.dmg"
 echo "组装布局 dmg：$DMG"
 "$ROOT/scripts/dmg-layout.sh" "$APP" "$DMG" "$APP_NAME"
 

@@ -54,6 +54,21 @@ cargo deb -p solidway --no-build --no-dbgsym --output "$DIST_DIR"
 cargo generate-rpm -p crates/solidway --output "$DIST_DIR" \
     --set-metadata "version = \"$rpm_version\""
 
+# 产物名带 OS 标记，便于在 Release 资产列表里一眼辨认（deb 在最后一个 `_` 前插入，
+# rpm 在最后一个 `.` 前插入）。deb/rpm 的包内元数据不受文件名影响。
+for file in "$DIST_DIR"/solidway_*.deb; do
+    [[ -f "$file" ]] || continue
+    dir="$(dirname "$file")"
+    name="$(basename "$file" .deb)"
+    mv -f "$file" "$dir/${name%_*}_linux_${name##*_}.deb"
+done
+for file in "$DIST_DIR"/solidway-*.rpm; do
+    [[ -f "$file" ]] || continue
+    dir="$(dirname "$file")"
+    name="$(basename "$file" .rpm)"
+    mv -f "$file" "$dir/${name%.*}.linux.${name##*.}.rpm"
+done
+
 echo
 echo "生成完成："
 find "$DIST_DIR" -maxdepth 1 -type f \( -name '*.deb' -o -name '*.rpm' \) -printf '  %p\n' | sort

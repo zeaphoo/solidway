@@ -8,6 +8,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **产物命名带操作系统标记**：`solidway[-app]_<ver>_<os>_<arch>[.<ext>]`（`<os>` = `linux` / `windows` / `macos`），服务包为 `solidway_<ver>-<rev>_<os>_<arch>`，例如 `solidway_0.5.0~rc.1-1_linux_amd64.deb`、`solidway-app_0.5.0-rc.1_macos_arm64.dmg`、`solidway-app_0.5.0-rc.1_windows_x64_portable.zip`，便于在 Release 资产列表里辨认平台。
+- **固定 Linux 构建机**：发布与 CI 的 Ubuntu job 由 `ubuntu-latest` 改为 `ubuntu-24.04`，避免 `-latest` 随基础镜像升级而抬高产物的 glibc 下限。
+
 ### Fixed
 
 - **发布资产**：Windows 便携版的 `solidway.exe` / `SolidwayApp.exe` 不再作为独立 Release 资产上传（发布物只有便携 zip，避免重复下载与体积误解）；发布收集步骤跳过 `*/portable/*`。

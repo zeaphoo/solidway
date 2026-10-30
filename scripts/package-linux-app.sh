@@ -106,7 +106,7 @@ case "$(uname -m)" in
     *) LINUX_ARCH="$(uname -m)" ;;
 esac
 for file in "${appimages[@]}"; do
-    cp -f "$file" "$DIST_DIR/solidway-app_${version}_${LINUX_ARCH}.AppImage"
+    cp -f "$file" "$DIST_DIR/solidway-app_${version}_linux_${LINUX_ARCH}.AppImage"
 done
 
 # deb：重写包名（solidway → solidway-app），避免与服务包 `solidway` 同名互相顶掉。
@@ -120,7 +120,7 @@ for file in "${debs[@]}"; do
     work="$(mktemp -d)"
     dpkg-deb -R "$file" "$work"
     sed -i 's/^Package: .*/Package: solidway-app/' "$work/DEBIAN/control"
-    out="$DIST_DIR/solidway-app_${version}_${arch}.deb"
+    out="$DIST_DIR/solidway-app_${version}_linux_${arch}.deb"
     dpkg-deb --root-owner-group -b "$work" "$out" >/dev/null
     rm -rf "$work"
 
