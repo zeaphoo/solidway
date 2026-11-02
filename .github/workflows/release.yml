@@ -419,5 +419,7 @@ jobs:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
           name: ${{ format('Solidway v{0}', needs.verify.outputs.version) }}
           body_path: release-notes.md
+          # rc / 预发布（semver 带 `-`）不能成为 Latest，按 tag 版本自动标记。
+          prerelease: ${{ contains(needs.verify.outputs.version, '-') }}
           fail_on_unmatched_files: true
           files: release/*
