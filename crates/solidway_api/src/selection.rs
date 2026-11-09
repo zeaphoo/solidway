@@ -43,6 +43,8 @@ pub struct ThresholdsOverride {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_latency_ms: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_tokens_per_sec: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exploration_rate: Option<f64>,
 }
 
@@ -73,6 +75,9 @@ pub fn resolve(strategy: SelectionStrategy, overrides: &SelectionOverrides) -> R
         thresholds.default_latency_ms = patch
             .default_latency_ms
             .unwrap_or(thresholds.default_latency_ms);
+        thresholds.default_tokens_per_sec = patch
+            .default_tokens_per_sec
+            .unwrap_or(thresholds.default_tokens_per_sec);
         thresholds.exploration_rate = patch
             .exploration_rate
             .unwrap_or(thresholds.exploration_rate);
@@ -93,7 +98,11 @@ pub fn resolve(strategy: SelectionStrategy, overrides: &SelectionOverrides) -> R
 /// 校验覆盖项；返回 `SelectionOverrides` 以便直接落库。
 pub fn validate(overrides: &SelectionOverrides) -> Result<()> {
     if let Some(patch) = &overrides.weights {
-        for (name, value) in [("uptime", patch.uptime), ("latency", patch.latency)] {
+        for (name, value) in [
+            ("uptime", patch.uptime),
+            ("latency", patch.latency),
+            ("throughput", patch.throughput),
+        ] {
             if let Some(value) = value
                 && !(0.0..=1.0).contains(&value)
             {
@@ -102,14 +111,12 @@ pub fn validate(overrides: &SelectionOverrides) -> Result<()> {
                 )));
             }
         }
-        for (name, value) in [("price", patch.price), ("throughput", patch.throughput)] {
-            if let Some(value) = value
-                && value != 0.0
-            {
-                return Err(ApiError::InvalidRequest(format!(
-                    "weights.{name} 本轮必须为 0（暂无对应指标）"
-                )));
-            }
+        if let Some(value) = patch.price
+            && value != 0.0
+        {
+            return Err(ApiError::InvalidRequest(
+                "weights.price 本轮必须为 0（暂无价格指标）".to_string(),
+            ));
         }
     }
     if let Some(patch) = &overrides.thresholds {
@@ -134,6 +141,13 @@ pub fn validate(overrides: &SelectionOverrides) -> Result<()> {
                 "thresholds.default_latency_ms 必须在 1-600000 之间".to_string(),
             ));
         }
+        if let Some(value) = patch.default_tokens_per_sec
+            && !(value > 0.0 && value <= 100_000.0)
+        {
+            return Err(ApiError::InvalidRequest(
+                "thresholds.default_tokens_per_sec 必须在 (0, 100000] 之间".to_string(),
+            ));
+        }
         if let Some(value) = patch.exploration_rate
             && !(0.0..=1.0).contains(&value)
         {
@@ -146,8 +160,11 @@ pub fn validate(overrides: &SelectionOverrides) -> Result<()> {
 }
 
 /// 从数据库行解析（策略列 + JSON 列）。解析失败时回退默认值并记录告警。
+///
+/// 策略列使用宽松解析：`uptime`（已删除的策略）映射为 `auto`，
+/// 兼容迁移前的存量行与写入回滚。
 pub fn from_row(strategy: &str, config: &str) -> (SelectionStrategy, SelectionOverrides) {
-    let strategy = SelectionStrategy::parse(strategy).unwrap_or_default();
+    let strategy = SelectionStrategy::parse_legacy(strategy).unwrap_or_default();
     let overrides = if config.trim().is_empty() {
         SelectionOverrides::default()
     } else {
@@ -173,12 +190,45 @@ mod tests {
         let latency = resolve(SelectionStrategy::Latency, &SelectionOverrides::default());
         assert_eq!(latency.weights.latency, 0.9);
         assert_eq!(latency.weights.uptime, 0.1);
+        assert_eq!(latency.weights.throughput, 0.0);
         assert_eq!(latency.thresholds.exploration_rate, 0.0);
 
+        let throughput = resolve(SelectionStrategy::Throughput, &SelectionOverrides::default());
+        assert_eq!(throughput.weights.throughput, 0.9);
+        assert_eq!(throughput.weights.latency, 0.0);
+
         let auto = resolve(SelectionStrategy::Auto, &SelectionOverrides::default());
-        assert_eq!(auto.weights.uptime, 0.75);
+        assert_eq!(auto.weights.uptime, 0.5);
+        assert_eq!(auto.weights.latency, 0.25);
+        assert_eq!(auto.weights.throughput, 0.25);
+        assert_eq!(auto.thresholds.default_tokens_per_sec, 30.0);
         assert_eq!(auto.thresholds.exploration_rate, 0.01);
         assert!(!auto.fallback);
+    }
+
+    #[test]
+    fn non_scoring_strategies_never_fall_back() {
+        let overrides = SelectionOverrides {
+            weights: Some(WeightsOverride {
+                uptime: Some(0.0),
+                latency: Some(0.0),
+                throughput: Some(0.0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        for strategy in [SelectionStrategy::RoundRobin, SelectionStrategy::LastUsed] {
+            let resolved = resolve(strategy, &overrides);
+            assert!(!resolved.fallback, "{strategy:?} 不应回退");
+        }
+    }
+
+    #[test]
+    fn legacy_uptime_strategy_maps_to_auto() {
+        let (strategy, _) = from_row("uptime", "{}");
+        assert_eq!(strategy, SelectionStrategy::Auto);
+        // 写入路径不接受已删除的策略。
+        assert!(SelectionStrategy::parse("uptime").is_none());
     }
 
     #[test]
@@ -196,6 +246,7 @@ mod tests {
         let resolved = resolve(SelectionStrategy::Auto, &overrides);
         assert_eq!(resolved.weights.uptime, 0.8);
         assert_eq!(resolved.weights.latency, 0.25);
+        assert_eq!(resolved.weights.throughput, 0.25);
         assert_eq!(resolved.thresholds.uptime_penalty, 90.0);
     }
 
@@ -205,6 +256,7 @@ mod tests {
             weights: Some(WeightsOverride {
                 uptime: Some(0.0),
                 latency: Some(0.0),
+                throughput: Some(0.0),
                 ..Default::default()
             }),
             ..Default::default()

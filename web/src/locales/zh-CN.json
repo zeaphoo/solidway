@@ -180,6 +180,9 @@
     "modelUnrename": "取消对外名称",
     "modelsEmpty": "还没有模型；留空表示不服务任何模型",
     "modelsHint": "默认直接用模型 id 作为对外名称；需要对外改名时点击铅笔按钮，左侧填上游实际 id，右侧填客户端看到的名称。",
+    "modelContextWindow": "上下文长度（tokens，可留空）",
+    "modelMaxOutput": "最大输出（tokens，可留空）",
+    "modelInput": "输入模态，如 text,image（可留空）",
     "fetchModels": "获取模型",
     "fetching": "获取中…",
     "fetchNeedsKey": "请先填写 API Key",
@@ -609,7 +612,7 @@
       "setup": "接入",
       "ops": "运维",
       "opsHint": "仅管理员可见，可稍后完成",
-    "opsProgress": "已完成 {{done}} / {{total}}"
+      "opsProgress": "已完成 {{done}} / {{total}}"
     },
     "concepts": {
       "title": "先认识三个对象",
@@ -722,23 +725,26 @@
   },
   "selection": {
     "title": "选号策略",
-    "hint": "决定同一条路由内先尝试哪个 Provider。只影响选号顺序，不影响请求与响应字节。",
+    "hint": "决定同一条路由内先尝试哪个 Provider。只影响选号顺序，不影响请求与响应字节。所有策略都先按优先级档位分组：高档位永远先于低档位尝试。",
     "strategy": "策略",
     "strategies": {
       "round_robin": "轮询",
-      "uptime": "可用性优先",
-      "latency": "首字节优先",
+      "last_used": "最后使用优先",
+      "latency": "响应快优先",
+      "throughput": "吞吐优先",
       "auto": "综合加权"
     },
     "strategyHints": {
-      "round_robin": "在健康候选间轮流分配，权重固定；与引入策略之前的行为一致。",
-      "uptime": "优先失败率低的 Provider（权重 0.9 / 时延 0.1）。",
-      "latency": "优先首字节更快的 Provider（权重 0.9 / 可用性 0.1）。",
-      "auto": "综合可用性与首字节时延打分，并保留少量随机探索。"
+      "round_robin": "同档位在健康候选间轮流分配，不使用会话记录。",
+      "last_used": "同一会话复用上次成功的 Provider（同档位内才生效），未命中时回退轮询。",
+      "latency": "同档位优先首字节更快的 Provider（时延权重 0.9）。",
+      "throughput": "同档位优先输出 token 速度更快的 Provider（吞吐权重 0.9）。",
+      "auto": "综合可用性（0.5）、时延（0.25）与吞吐（0.25）打分，并保留少量随机探索。"
     },
     "weights": {
       "uptime": "可用性权重",
-      "latency": "首字节权重"
+      "latency": "首字节权重",
+      "throughput": "吞吐权重"
     },
     "explorationRate": "随机探索比例",
     "explorationHint": "0 表示不探索；探索时按轮询顺序选号，为新 Provider 积累样本。",
@@ -746,19 +752,37 @@
     "uptimePenalty": "惩罚阈值（%）",
     "defaultUptime": "兜底可用性（%）",
     "defaultLatency": "兜底时延（ms）",
-    "fixedWeights": "该策略使用固定权重（可用性 {{uptime}} / 首字节 {{latency}}），无需配置。",
-    "fallbackHint": "两项权重都是 0，当前按轮询选号。",
+    "defaultTokensPerSec": "兜底吞吐（token/s）",
+    "fixedWeights": "该策略使用固定权重（可用性 {{uptime}} / 首字节 {{latency}} / 吞吐 {{throughput}}），无需配置。",
+    "fallbackHint": "三项权重都是 0，当前按轮询选号。",
     "metrics": "当前指标（数据面内存，10 秒刷新）",
     "ttfb": "首字节",
     "uptime": "可用性",
+    "tokensPerSec": "token/s",
     "samples": "样本",
     "score": "分数",
-    "metricState": "状态",
+    "metricState": "指标状态",
+    "health": "健康",
     "stateMissing": "无样本",
+    "stateFresh": "新鲜",
     "stateStale": "陈旧",
     "disabled": "已停用",
     "noProviders": "该路由还没有可参与选号的 Provider。",
-    "saved": "策略已生效，无需重启"
+    "saved": "策略已生效，无需重启",
+    "affinity": {
+      "title": "会话记录",
+      "count": "当前 {{count}} 条",
+      "empty": "当前无会话记录",
+      "hint": "记录在所有策略下都会写入，但只有「最后使用优先」会读取它。",
+      "model": "模型",
+      "session": "会话标识",
+      "provider": "Provider",
+      "expiresAt": "过期时刻",
+      "clearOne": "清除",
+      "clearAll": "全部清除",
+      "cleared": "已清除，下次请求按档位重新选号",
+      "diagnosticOnly": "当前策略不读取会话记录，此列表仅作诊断。"
+    }
   },
   "incidents": {
     "pageTitle": "Provider 故障",

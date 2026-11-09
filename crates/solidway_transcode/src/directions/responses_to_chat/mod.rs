@@ -15,6 +15,9 @@ pub(crate) static DIRECTION: ResponsesToChat = ResponsesToChat;
 
 pub(crate) const CAPS: DirectionCaps = DirectionCaps {
     request: RequestCaps {
+        // Chat 上游未必认 `developer`：统一降级为 system（开头）/ user（会话中段）。
+        developer_role: Support::Emulated,
+        system_messages: Support::Emulated,
         structured_output: Support::Lossy(
             "Responses text.format is mapped to Chat response_format",
         ),

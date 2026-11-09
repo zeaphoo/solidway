@@ -300,6 +300,42 @@ fn responses_to_chat_request_and_response() {
 }
 
 #[test]
+fn responses_to_chat_emulates_developer_role() {
+    // Responses 的 `developer` 是系统提示；Chat 上游只保证 system/user/assistant/tool。
+    let body = serde_json::json!({
+        "model": "m",
+        "instructions": "lead",
+        "input": [
+            {"type": "message", "role": "developer", "content": [{"type": "input_text", "text": "dev"}]},
+            {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "hi"}]},
+            {"type": "message", "role": "developer", "content": [{"type": "input_text", "text": "late"}]},
+            {"type": "message", "role": "system", "content": [{"type": "input_text", "text": "also late"}]}
+        ]
+    });
+    let (chat, report) = request(
+        ProtocolId::OPENAI_RESPONSES,
+        ProtocolId::OPENAI_CHAT,
+        &body.to_string(),
+    );
+    let roles: Vec<&str> = chat["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|message| message["role"].as_str().unwrap())
+        .collect();
+    // 开头连续的 instruction 保留为 system；会话中段的降级为 user。
+    assert_eq!(roles, vec!["system", "system", "user", "user", "user"]);
+    assert!(!chat.to_string().contains("developer"));
+    assert!(
+        report
+            .warnings
+            .iter()
+            .any(|warning| warning.pointer.contains("role")),
+        "降级必须可观测"
+    );
+}
+
+#[test]
 fn responses_to_chat_stream() {
     let out = stream(
         ProtocolId::OPENAI_RESPONSES,

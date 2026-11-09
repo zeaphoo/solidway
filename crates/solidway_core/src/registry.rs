@@ -9,7 +9,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::SystemTime;
 
 use crate::config::{
-    ApiFormat, CoreConfig, ModelMapping, ProviderEntry, RouteSelection, SelectionStrategy,
+    ApiFormat, CoreConfig, ModelLimits, ModelMapping, ProviderEntry, RouteSelection,
+    SelectionStrategy,
 };
 use crate::health::{HealthManager, HealthState, Probing, epoch_secs};
 use crate::metrics::Metrics;
@@ -26,6 +27,8 @@ pub struct ProviderRuntime {
     pub auth_scheme: String,
     /// Provider 级非敏感选项（原样透传给转发层）。
     pub options: Option<serde_json::Value>,
+    /// 上游兼容适配档（由控制面按 provider 预设冻结，见 [`crate::compat`]）。
+    pub compat: crate::compat::Profile,
     pub api_formats: Vec<ApiFormat>,
     pub models: Vec<ModelMapping>,
     pub enabled: bool,
@@ -51,6 +54,21 @@ impl ProviderRuntime {
     /// 该凭据是否声明了此客户端模型名。
     pub fn serves_model(&self, name: &str) -> bool {
         self.models.iter().any(|mapping| mapping.name == name)
+    }
+
+    /// 该 provider 是否声明支持某输入模态；未声明视为「不知道」（按支持处理）。
+    pub fn accepts_modality(&self, name: &str, modality: &str) -> bool {
+        match self
+            .models
+            .iter()
+            .find(|mapping| mapping.name == name)
+            .and_then(|mapping| mapping.input.as_ref())
+        {
+            Some(input) => input
+                .iter()
+                .any(|value| value.eq_ignore_ascii_case(modality)),
+            None => true,
+        }
     }
 
     /// 客户端模型名对应的上游模型 id。
@@ -92,6 +110,8 @@ pub struct RouteRuntime {
     rotation: HashMap<(String, ApiFormat), Vec<usize>>,
     /// 模型 → 成员 provider 序号（不限格式，供探针挑选）。
     model_members: HashMap<String, Vec<usize>>,
+    /// 模型 → 对外声明的元数据（启用 provider 的保守交集）。
+    model_limits: HashMap<String, ModelLimits>,
     /// 选号策略（控制面解析后的完整配置）。
     pub selection: RouteSelection,
 }
@@ -122,6 +142,19 @@ impl RouteRuntime {
     pub fn provider(&self, index: usize) -> &ProviderRuntime {
         &self.providers[index]
     }
+
+    /// 该模型对外声明的元数据；没有任何 provider 声明时为 `None`。
+    pub fn model_limits(&self, model: &str) -> Option<&ModelLimits> {
+        self.model_limits.get(model)
+    }
+
+    /// 声明了该模型的 provider 序号（不限格式、含未参与选号的档位）。
+    pub fn providers_for_model(&self, model: &str) -> &[usize] {
+        self.model_members
+            .get(model)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
 }
 
 /// API Key 的解析结果：`key_hash` → 所属路由。
@@ -150,6 +183,7 @@ fn to_runtime(entry: &ProviderEntry) -> ProviderRuntime {
         credential_kind: entry.credential_kind.clone(),
         auth_scheme: entry.auth_scheme.clone(),
         options: entry.options.clone(),
+        compat: crate::compat::Profile::from_options(entry.options.as_ref()),
         api_formats: entry.api_formats.clone(),
         models: entry.models.clone(),
         enabled: entry.enabled,
@@ -180,6 +214,7 @@ impl Registry {
             let mut inbound_models: HashSet<String> = HashSet::new();
             let mut capability: HashSet<(String, ApiFormat)> = HashSet::new();
             let mut model_members: HashMap<String, Vec<usize>> = HashMap::new();
+            let mut model_limits: HashMap<String, ModelLimits> = HashMap::new();
             for (index, provider) in members.iter().enumerate() {
                 if !provider.enabled {
                     continue;
@@ -193,6 +228,12 @@ impl Registry {
                     let model = &mapping.name;
                     models_set.insert(model.clone());
                     model_members.entry(model.clone()).or_default().push(index);
+                    if let Some(limits) = mapping.limits() {
+                        model_limits
+                            .entry(model.clone())
+                            .and_modify(|current| current.intersect(&limits))
+                            .or_insert(limits);
+                    }
                     for format in &provider.api_formats {
                         capability.insert((model.clone(), *format));
                         inbound_models.insert(model.clone());
@@ -222,6 +263,7 @@ impl Registry {
                     capability,
                     rotation,
                     model_members,
+                    model_limits,
                     selection: route.selection,
                 },
             );
@@ -277,7 +319,7 @@ pub struct Pick {
 }
 
 impl Pick {
-    /// 本轮尝试顺序：粘性优先，其余按轮询顺序。
+    /// 本轮尝试顺序：会话记录命中的首选在前，其余按策略顺序。
     pub fn order(&self) -> Vec<String> {
         let mut order = Vec::with_capacity(self.candidates.len() + 1);
         if let Some(preferred) = &self.preferred {
@@ -314,7 +356,7 @@ impl Selector {
     }
 
     /// 选号：候选 = 提供该模型与格式、健康、`priority > 0` 的 provider；
-    /// 顺序由路由的选号策略决定（默认轮询，与引入策略之前一致）。
+    /// 档位是硬约束，策略只决定档内顺序。
     pub async fn pick(
         &self,
         route: &RouteRuntime,
@@ -335,10 +377,20 @@ impl Selector {
             }
             usable.push(index);
         }
+        // 当前候选集合的最高档位（档位是硬约束）。
+        let top_priority = usable
+            .iter()
+            .map(|&index| route.provider(index).priority)
+            .max();
 
+        // 会话记录只由 `last_used` 策略读取，且 MUST 服从档位：
+        // 记录指向的凭据处于当前候选的最高档位时才置顶（跨档位不生效，条目保留）。
+        let strategy = route.selection.effective_strategy();
         let mut preferred = None;
-        if let Some(id) = affinity
-            && usable.iter().any(|&index| route.provider(index).id == id)
+        if strategy == SelectionStrategy::LastUsed
+            && let Some(id) = affinity
+            && let Some(&index) = usable.iter().find(|&&index| route.provider(index).id == id)
+            && Some(route.provider(index).priority) == top_priority
         {
             preferred = Some(id.to_string());
         }
@@ -364,7 +416,7 @@ impl Selector {
         }
     }
 
-    /// 按策略把候选排成尝试顺序（不含粘性偏好）。
+    /// 按策略把候选排成尝试顺序（不含会话记录偏好）。
     ///
     /// 排序键是 **(priority 降序, 策略顺序)**：先按档位分组，档内再按策略
     /// （轮询 / 打分）排列，档内同分或轮询起点用计数器打散。
@@ -406,7 +458,7 @@ impl Selector {
 
         let mut ordered = Vec::with_capacity(len);
         for (_priority, mut offsets) in tiers {
-            if strategy == SelectionStrategy::RoundRobin || explore {
+            if !strategy.is_scoring() || explore {
                 offsets.sort_by_key(|&offset| rank(offset));
             } else {
                 offsets.sort_by(|&a, &b| {
@@ -465,10 +517,8 @@ impl Selector {
                 uptime_pct: view.uptime_pct,
                 samples: view.samples,
                 stale: view.stale,
-                score: match strategy {
-                    SelectionStrategy::RoundRobin => None,
-                    _ => scores.get(&index).copied(),
-                },
+                tokens_per_sec: view.tokens_per_sec,
+                score: strategy.is_scoring().then(|| scores.get(&index).copied()).flatten(),
             });
         }
         out
@@ -486,15 +536,18 @@ pub struct ProviderSnapshot {
     pub health: String,
     pub ttfb_ms: Option<f64>,
     pub uptime_pct: Option<f64>,
+    /// 输出 token 速度（tokens/s）；无吞吐样本时为 `None`。
+    pub tokens_per_sec: Option<f64>,
     pub samples: u64,
     pub stale: bool,
-    /// 当前策略下的分数；轮询策略为 `None`。
+    /// 当前策略下的分数；非打分策略（`round_robin` / `last_used`）为 `None`。
     pub score: Option<f64>,
 }
 
 /// 候选集合的打分（越小越好），`route_provider_index → score`。
 ///
-/// `score = (w_uptime/Σw)·uptimeRatio + (w_latency/Σw)·latencyRatio + uptimePenalty`
+/// `score = (w_uptime/Σw)·uptimeRatio + (w_latency/Σw)·latencyRatio
+///        + (w_throughput/Σw)·throughputRatio + uptimePenalty`
 ///
 /// `priority` 不进分数：它是**档位**，由 [`Selector::order_candidates`] 先分组。
 fn score_map(
@@ -505,7 +558,7 @@ fn score_map(
     now: i64,
 ) -> HashMap<usize, f64> {
     let mut out = HashMap::with_capacity(members.len());
-    if members.is_empty() || selection.effective_strategy() == SelectionStrategy::RoundRobin {
+    if members.is_empty() || !selection.effective_strategy().is_scoring() {
         return out;
     }
     let weights = selection.weights;
@@ -515,7 +568,7 @@ fn score_map(
     }
     let thresholds = selection.thresholds;
 
-    let samples: Vec<(usize, f64, f64)> = members
+    let samples: Vec<(usize, f64, f64, f64)> = members
         .iter()
         .map(|&index| {
             let provider = route.provider(index);
@@ -528,20 +581,27 @@ fn score_map(
                 value
                     .map(|v| v.uptime_pct)
                     .unwrap_or(thresholds.default_uptime),
+                value
+                    .and_then(|v| v.tokens_per_sec)
+                    .unwrap_or(thresholds.default_tokens_per_sec),
             )
         })
         .collect();
 
     let min_ttfb = samples
         .iter()
-        .map(|(_, ttfb, _)| *ttfb)
+        .map(|(_, ttfb, _, _)| *ttfb)
         .fold(f64::INFINITY, f64::min);
     let max_uptime = samples
         .iter()
-        .map(|(_, _, uptime)| *uptime)
+        .map(|(_, _, uptime, _)| *uptime)
         .fold(f64::NEG_INFINITY, f64::max);
+    let min_throughput = samples
+        .iter()
+        .map(|(_, _, _, throughput)| *throughput)
+        .fold(f64::INFINITY, f64::min);
 
-    for (index, ttfb, uptime) in samples {
+    for (index, ttfb, uptime, throughput) in samples {
         let uptime_ratio = if uptime > 0.0 {
             max_uptime / uptime - 1.0
         } else {
@@ -549,6 +609,12 @@ fn score_map(
         };
         let latency_ratio = if min_ttfb > 0.0 {
             ttfb / min_ttfb - 1.0
+        } else {
+            0.0
+        };
+        // 吞吐越高越好：minThroughput / throughput − 1（吞吐越高，比值越小）。
+        let throughput_ratio = if throughput > 0.0 && min_throughput > 0.0 {
+            min_throughput / throughput - 1.0
         } else {
             0.0
         };
@@ -561,6 +627,7 @@ fn score_map(
         };
         let score = (weights.uptime / total) * uptime_ratio
             + (weights.latency / total) * latency_ratio
+            + (weights.throughput / total) * throughput_ratio
             + penalty;
         out.insert(index, score);
     }
@@ -635,7 +702,7 @@ mod tests {
                 .iter()
                 .map(|m| ModelMapping {
                     name: m.to_string(),
-                    upstream: String::new(),
+                    ..ModelMapping::default()
                 })
                 .collect(),
             enabled,
@@ -723,7 +790,7 @@ mod tests {
         config.providers[2].api_formats = vec![];
         config.providers[2].models = vec![ModelMapping {
             name: "only-empty".to_string(),
-            upstream: String::new(),
+            ..ModelMapping::default()
         }];
         let registry = Registry::new(&config);
         let route = registry.route("r1").expect("route");

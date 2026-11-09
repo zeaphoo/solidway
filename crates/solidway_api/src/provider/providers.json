@@ -31,7 +31,11 @@
       "default_api_formats": [
         "chat_completions"
       ],
-      "kind": "api"
+      "kind": "api",
+      "chat_compat": {
+        "developer_role": "emulated",
+        "thinking": "qwen"
+      }
     },
     {
       "key": "alibaba-cn",
@@ -45,7 +49,11 @@
       "default_api_formats": [
         "chat_completions"
       ],
-      "kind": "api"
+      "kind": "api",
+      "chat_compat": {
+        "developer_role": "emulated",
+        "thinking": "qwen"
+      }
     },
     {
       "key": "alibaba-coding-plan",
@@ -59,7 +67,11 @@
       "default_api_formats": [
         "chat_completions"
       ],
-      "kind": "coding_plan"
+      "kind": "coding_plan",
+      "chat_compat": {
+        "developer_role": "emulated",
+        "thinking": "qwen"
+      }
     },
     {
       "key": "alibaba-coding-plan-cn",
@@ -73,7 +85,11 @@
       "default_api_formats": [
         "chat_completions"
       ],
-      "kind": "coding_plan"
+      "kind": "coding_plan",
+      "chat_compat": {
+        "developer_role": "emulated",
+        "thinking": "qwen"
+      }
     },
     {
       "key": "alibaba-token-plan",
@@ -87,7 +103,11 @@
       "default_api_formats": [
         "chat_completions"
       ],
-      "kind": "token_plan"
+      "kind": "token_plan",
+      "chat_compat": {
+        "developer_role": "emulated",
+        "thinking": "qwen"
+      }
     },
     {
       "key": "alibaba-token-plan-cn",
@@ -101,7 +121,11 @@
       "default_api_formats": [
         "chat_completions"
       ],
-      "kind": "token_plan"
+      "kind": "token_plan",
+      "chat_compat": {
+        "developer_role": "emulated",
+        "thinking": "qwen"
+      }
     },
     {
       "key": "anthropic",

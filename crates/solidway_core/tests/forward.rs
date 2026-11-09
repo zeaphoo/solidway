@@ -171,6 +171,7 @@ async fn model_alias_rewrites_request_and_response() {
     cfg.providers[0].models = vec![ModelMapping {
         name: "gpt-5".to_string(),
         upstream: "gpt-5-2025-08-07".to_string(),
+        ..ModelMapping::default()
     }];
     let (base, _core) = spawn_core(cfg).await;
 
@@ -202,6 +203,7 @@ async fn error_body_is_not_alias_rewritten() {
     cfg.providers[0].models = vec![ModelMapping {
         name: "gpt-5".to_string(),
         upstream: "gpt-5-2025-08-07".to_string(),
+        ..ModelMapping::default()
     }];
     let (base, _core) = spawn_core(cfg).await;
 
@@ -267,6 +269,7 @@ async fn model_alias_rewrites_streaming_events() {
     cfg.providers[0].models = vec![ModelMapping {
         name: "gpt-5".to_string(),
         upstream: "gpt-5-2025-08-07".to_string(),
+        ..ModelMapping::default()
     }];
     let (base, _core) = spawn_core(cfg).await;
 

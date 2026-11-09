@@ -44,6 +44,43 @@ pub async fn build_startup_config(state: &AppState) -> Result<CoreConfig> {
     build_config(state, true).await
 }
 
+/// 合并 provider 选项与预设适配档。
+///
+/// 预设提供上游兼容默认值（数据面按它改写表示层）；库里 `options.compat` 逐字段覆盖，
+/// 因此**已有凭据无需迁移**，也保留了 `compat: native` 这个回滚开关。
+fn resolve_options(
+    options: Option<serde_json::Value>,
+    provider: &str,
+) -> Option<serde_json::Value> {
+    let preset_compat = crate::provider::presets::preset_of(provider)
+        .and_then(|preset| preset.chat_compat.clone());
+    let Some(preset_compat) = preset_compat else {
+        return options;
+    };
+    let mut map = match options {
+        Some(serde_json::Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+    let mut compat = match map.remove("compat") {
+        Some(serde_json::Value::Object(user)) => user,
+        _ => serde_json::Map::new(),
+    };
+    if let serde_json::Value::Object(preset) = preset_compat {
+        // 预设只补缺省，用户显式写入的字段优先（覆盖 / 回滚）。
+        for (key, value) in preset {
+            compat.entry(key).or_insert(value);
+        }
+    }
+    if !compat.is_empty() {
+        map.insert("compat".to_string(), serde_json::Value::Object(compat));
+    }
+    if map.is_empty() {
+        None
+    } else {
+        Some(serde_json::Value::Object(map))
+    }
+}
+
 async fn build_config(state: &AppState, with_seeds: bool) -> Result<CoreConfig> {
     let route_rows = routes::list(&state.pool).await?;
     let provider_rows = provider_keys::list_all(&state.pool).await?;
@@ -77,6 +114,12 @@ async fn build_config(state: &AppState, with_seeds: bool) -> Result<CoreConfig> 
         let aad = format!("provider_key|{}", row.id);
         let api_key = state.cipher.decrypt(&row.credential_ciphertext, &aad)?;
         // 以记录上的显式鉴权方式为准；空值回退到所属预设。
+        let options = resolve_options(
+            row.options
+                .as_deref()
+                .and_then(|raw| serde_json::from_str(raw).ok()),
+            &row.provider,
+        );
         let auth_scheme = if row.auth_scheme.trim().is_empty() {
             crate::provider::presets::preset_of(&row.provider)
                 .map(|preset| preset.auth_scheme.clone())
@@ -93,10 +136,8 @@ async fn build_config(state: &AppState, with_seeds: bool) -> Result<CoreConfig> 
             api_key,
             credential_kind: row.credential_kind,
             auth_scheme,
-            options: row
-                .options
-                .as_deref()
-                .and_then(|raw| serde_json::from_str(raw).ok()),
+            options,
+            // 注意：`options` 在上面按预设适配档合并过，见 `resolve_options`。
             api_formats: parse_api_formats(&row.api_formats),
             models: parse_models(&row.models),
             enabled: row.status == "active",
@@ -394,5 +435,46 @@ impl AppState {
         if let Some(collector) = collector {
             collector.refresh_settings().await;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preset_compat_is_frozen_into_options() {
+        let options = resolve_options(None, "alibaba-token-plan-cn");
+        let compat = options
+            .as_ref()
+            .and_then(|value| value.get("compat"))
+            .expect("compat");
+        assert_eq!(compat["developer_role"], "emulated");
+        assert_eq!(compat["thinking"], "qwen");
+    }
+
+    #[test]
+    fn custom_copies_inherit_preset_compat() {
+        let options = resolve_options(None, "alibaba-token-plan-cn-custom");
+        assert_eq!(options.unwrap()["compat"]["developer_role"], "emulated");
+    }
+
+    #[test]
+    fn user_compat_overrides_preset_field_by_field() {
+        // 回滚开关：显式写 native 就按 native 走，其余字段仍用预设默认。
+        let user = serde_json::json!({"compat": {"developer_role": "native"}});
+        let options = resolve_options(Some(user), "alibaba-token-plan-cn").expect("options");
+        assert_eq!(options["compat"]["developer_role"], "native");
+        assert_eq!(options["compat"]["thinking"], "qwen");
+    }
+
+    #[test]
+    fn providers_without_preset_keep_options_unmodified() {
+        assert!(resolve_options(None, "acme-custom").is_none());
+        let user = serde_json::json!({"path_params": {"x": "1"}});
+        assert_eq!(
+            resolve_options(Some(user.clone()), "acme-custom"),
+            Some(user)
+        );
     }
 }

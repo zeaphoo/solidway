@@ -126,10 +126,12 @@ async fn builds_core_config_with_decrypted_credentials_and_health_seed() {
             solidway_core::ModelMapping {
                 name: "gpt-5".to_string(),
                 upstream: "gpt-5-2025".to_string(),
+                ..Default::default()
             },
             solidway_core::ModelMapping {
                 name: "gpt-5-mini".to_string(),
                 upstream: "gpt-5-mini".to_string(),
+                ..Default::default()
             },
         ]
     );

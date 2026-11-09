@@ -25,6 +25,7 @@ fn responses_request(session: &str) -> ClientRequest {
 #[tokio::test]
 async fn same_session_reuses_same_provider() {
     let harness = Harness::two_providers("affinity-hit", "").await;
+    harness.set_strategy("r-main", "last_used").await;
     harness.mocks.a.set_fallback(MockResponse::ok("gpt-5"));
     harness.mocks.b.set_fallback(MockResponse::ok("gpt-5"));
 
@@ -75,6 +76,7 @@ async fn affinity_is_isolated_per_model_within_the_same_session() {
         ]
     })
     .await;
+    harness.set_strategy("r-main", "last_used").await;
     harness.mocks.a.set_fallback(MockResponse::ok("gpt-5"));
     harness.mocks.b.set_fallback(MockResponse::ok("gpt-5"));
 
@@ -102,6 +104,7 @@ async fn affinity_is_isolated_per_model_within_the_same_session() {
 #[tokio::test]
 async fn affinity_follows_provider_switch_after_quarantine() {
     let harness = Harness::two_providers("affinity-follow", "").await;
+    harness.set_strategy("r-main", "last_used").await;
     // provider A 首次成功（建立粘性）→ 之后 429（被移出）。
     harness.mocks.a.script(vec![MockResponse::ok("gpt-5")]);
     harness
@@ -138,6 +141,7 @@ async fn affinity_follows_provider_switch_after_quarantine() {
 #[tokio::test]
 async fn affinity_is_not_updated_when_switch_fails() {
     let harness = Harness::two_providers("affinity-stale", "").await;
+    harness.set_strategy("r-main", "last_used").await;
     // A 先成功建立粘性，随后 A、B 都因配额耗尽进入长冷却（候选集合耗尽）。
     harness.mocks.a.script(vec![MockResponse::ok("gpt-5")]);
     harness
@@ -184,6 +188,7 @@ async fn affinity_hits_renew_the_sliding_ttl() {
     // 滑动 TTL：每次命中续期，因此在远超单个 TTL 的时间窗内仍复用同一 provider。
     // 间隔取 1s、TTL 取 5s，留足请求开销的余量（避免把「本来就会过期」测成续期）。
     let harness = Harness::two_providers("affinity-renew", "affinity_ttl = \"5s\"").await;
+    harness.set_strategy("r-main", "last_used").await;
     harness.mocks.a.set_fallback(MockResponse::ok("gpt-5"));
     harness.mocks.b.set_fallback(MockResponse::ok("gpt-5"));
 
@@ -210,6 +215,7 @@ async fn expired_affinity_returns_to_round_robin() {
     // 超过 TTL 未被命中 → 条目清除、重新按选号策略选号；
     // 与长 TTL 的对照组相比，请求会重新分散到多个 provider。
     let short = Harness::two_providers("affinity-expire-short", "affinity_ttl = \"1s\"").await;
+    short.set_strategy("r-main", "last_used").await;
     for mock in [&short.mocks.a, &short.mocks.b] {
         mock.set_fallback(MockResponse::ok("gpt-5"));
     }
@@ -229,6 +235,7 @@ async fn expired_affinity_returns_to_round_robin() {
     );
 
     let long = Harness::two_providers("affinity-expire-long", "affinity_ttl = \"1h\"").await;
+    long.set_strategy("r-main", "last_used").await;
     for mock in [&long.mocks.a, &long.mocks.b] {
         mock.set_fallback(MockResponse::ok("gpt-5"));
     }
@@ -250,6 +257,7 @@ async fn expired_affinity_returns_to_round_robin() {
 #[tokio::test]
 async fn chat_completions_uses_prompt_cache_key_for_affinity() {
     let harness = Harness::two_providers("affinity-chat", "").await;
+    harness.set_strategy("r-main", "last_used").await;
     harness.mocks.a.set_fallback(MockResponse::ok("gpt-5"));
     harness.mocks.b.set_fallback(MockResponse::ok("gpt-5"));
 

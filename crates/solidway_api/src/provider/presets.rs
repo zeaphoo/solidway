@@ -79,6 +79,9 @@ pub struct ProviderPreset {
     /// 族内变体标签（i18n key）。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub variant_label: Option<String>,
+    /// 上游兼容适配档（数据面据此改写表示层；缺省 = native，逐字节透传）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat_compat: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -207,6 +210,9 @@ pub struct ProviderPresetView {
     pub group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variant_label: Option<String>,
+    /// 上游兼容适配档（只读展示；控制面在写入时冻结进 provider 选项）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chat_compat: Option<serde_json::Value>,
     /// 预设条目的端点与格式由目录决定，控制台据此禁用编辑。
     pub locked_fields: Vec<&'static str>,
 }
@@ -233,6 +239,7 @@ impl From<&ProviderPreset> for ProviderPresetView {
             anthropic_version: preset.anthropic_version.clone(),
             group: preset.group.clone(),
             variant_label: preset.variant_label.clone(),
+            chat_compat: preset.chat_compat.clone(),
             locked_fields: vec!["base_url", "api_formats", "auth_scheme", "provider"],
         }
     }
@@ -329,6 +336,32 @@ mod tests {
             default_api_formats(minimax),
             vec![ApiFormat::AnthropicMessages]
         );
+    }
+
+    #[test]
+    fn alibaba_family_declares_chat_compat() {
+        // DashScope 兼容族只认 system/assistant/user/tool/function，thinking 走 enable_thinking。
+        for key in [
+            "alibaba",
+            "alibaba-cn",
+            "alibaba-coding-plan",
+            "alibaba-coding-plan-cn",
+            "alibaba-token-plan",
+            "alibaba-token-plan-cn",
+        ] {
+            let preset = find(key).unwrap_or_else(|| panic!("{key} 应存在"));
+            let compat = preset
+                .chat_compat
+                .as_ref()
+                .unwrap_or_else(|| panic!("{key} 缺少 chat_compat"));
+            assert_eq!(compat["developer_role"], "emulated", "{key}");
+            assert_eq!(compat["thinking"], "qwen", "{key}");
+        }
+        // 自定义副本沿用预设适配档（端点不变、行为也不变）。
+        assert!(preset_of("alibaba-token-plan-cn-custom").is_some());
+        // 不含未实测的夸大声明。
+        let openai = find("openai").expect("openai");
+        assert!(openai.chat_compat.is_none());
     }
 
     #[test]

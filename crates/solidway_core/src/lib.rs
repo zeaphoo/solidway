@@ -10,12 +10,14 @@
 //! 输出 = [`CoreEvent`] 事件流，由控制面消费并持久化。
 
 pub mod affinity;
+pub mod compat;
 pub mod config;
 pub mod decode;
 pub mod engine;
 pub mod event;
 pub mod health;
 pub mod inbound;
+mod jsonbytes;
 pub mod metrics;
 pub mod registry;
 pub mod sigv4;

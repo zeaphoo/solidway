@@ -104,6 +104,14 @@ query 中的凭据类参数（`key` / `api_key`，大小写不敏感）MUST NOT 
 - **WHEN** Anthropic SDK 以 `x-api-key` 请求 `GET /v1/models`
 - **THEN** 每个条目含 `type = "model"`、`display_name` 与 `created_at`，顶层含 `has_more` / `first_id` / `last_id`
 
+#### Scenario: 模型元数据对外声明
+- **WHEN** provider 的模型映射声明了 `context_window` / `max_output_tokens` / `input`
+- **THEN** 该模型条目额外含 `context_length` 与 `context_window`、`max_output_tokens` 与 `top_provider.max_completion_tokens`、`input_modalities` 与 `architecture.input_modalities`；未声明的字段 MUST 省略（客户端据此回落到自身默认值）
+
+#### Scenario: 多 provider 同模型的元数据取保守交集
+- **WHEN** 同一模型由多个 provider 承载，且各自的 `context_window` / `max_output_tokens` / `input` 不同
+- **THEN** 数值取最小值、模态取交集；未知（未声明）的一方 MUST NOT 覆盖已知值
+
 ### Requirement: 保真转发与白名单改写
 
 网关 MUST 原样转发请求体、响应体与流式事件，响应状态码原样回传；改写白名单为**五项**：
@@ -115,6 +123,8 @@ query 中的凭据类参数（`key` / `api_key`，大小写不敏感）MUST NOT 
 5. 响应中回写的模型名（仅模型别名生效时，**仅限成功响应**）：见「保真转发与白名单改写」下各家族说明与「Anthropic Messages 通路」。错误响应体（含 LastFailure 透传的上游错误体）MUST 原样透传，MUST NOT 回写 `model`。
 
 其余字节 MUST NOT 改动；流式响应 MUST NOT 缓冲。除入站鉴权头外的请求头（含 `anthropic-version` / `anthropic-beta`）MUST 原样转发。
+
+在此之上，仅「上游兼容适配」中声明的表示层规则可以改写请求体；未声明适配档（`native`）时 MUST 与上述白名单完全一致。
 
 顶层 `model` 的改写仅发生在模型别名生效时（`upstream` 与客户端 `name` 不同）：请求把顶层 `model` 的字符串值替换为该 Provider 声明的上游模型 id；**成功响应**把顶层 `model` 回写为客户端模型名；非流式响应 MUST 整体读取后定点替换，流式响应 MUST 按事件行处理且 MUST NOT 缓冲整条流。除上述位置外，MUST NOT 改写嵌套对象或数组中的任何同名字段。
 
@@ -145,6 +155,55 @@ query 中的凭据类参数（`key` / `api_key`，大小写不敏感）MUST NOT 
 #### Scenario: 流式回写
 - **WHEN** 上游以 `text/event-stream` 返回，事件数据中含顶层 `model`
 - **THEN** 每个 `data: {...}` 事件的顶层 `model` 被回写为客户端模型名，`data: [DONE]` 等非 JSON 行原样保留
+
+### Requirement: 上游兼容适配（表示层归一化）
+
+`chat_completions` 只是宽松族：同名协议不等于同名行为。各上游在角色集合、thinking 参数形状、必填组合上并不一致，客户端按其自身假设发出的请求会被严格上游拒绝（例如阿里 DashScope / Token Plan 只接受 `system / assistant / user / tool / function`）。
+
+网关 SHALL 支持按 **provider 适配档** 做表示层归一化：
+
+1. 适配档 MUST 由控制面按 provider 预设解析并随配置冻结下发（provider 选项 `compat`）；数据面 MUST NOT 依据 provider 名称、URL 或目录内容推断；
+2. 适配档缺省为 `native`：此时请求体 MUST 与「保真转发与白名单改写」完全一致（逐字节）；
+3. 非 native 档只允许改写**表示层**：角色名（`developer` → `system`）、指令消息位置（会话中段降级为 `user`）、thinking 参数形状（`reasoning_effort` / `thinking` → 顶层 `enable_thinking`）、上游不接受的顶层字段（`store` / `stream_options`）；MUST NOT 改写正文、工具 schema、消息顺序（降级除外）与未知字段；
+4. 规则 MUST 幂等且确定；MUST 定点改写而非整包 re-serialize（`system_messages = fold` 允许一次 JSON 重建）；
+5. 每次改写 MUST 产出计数与规则 id 日志，MUST NOT 记录请求内容；
+6. provider 级 MUST 可用 `compat: native` 回滚；配置下发 MUST 清空学习表。
+
+网关另 SHALL 支持**签名自愈重试**：上游 400 且错误体命中已知签名（如 `developer is not one of [...]`、`System message must be at the beginning.`）时，按签名应用最小规则后对**同一 provider** 重试一次。该重试 MUST NOT 标记凭据、MUST NOT 换号、每请求至多一次；结论 SHALL 记入进程内学习表（TTL 到期或配置下发即失效），后续请求在预检阶段直接应用。
+
+`GET /v1/models` SHALL 为每个模型附带 `compatibility`：该模型所有可服务 `chat_completions` provider 适配档的**交集**。该字段是给客户端做兼容判断的提示，网关 MUST NOT 依赖客户端据此调整行为。
+
+#### Scenario: 适配档为 native 时逐字节透传
+- **WHEN** provider 未声明 `compat`
+- **THEN** 上游收到的请求体与客户端请求体逐字节一致（含 `developer` 角色）
+
+#### Scenario: developer 角色归一化
+- **WHEN** provider 适配档为 `developer_role = emulated`，请求含 `role = "developer"`
+- **THEN** 上游收到同一位置上的 `role = "system"`，其余字节不变
+
+#### Scenario: 会话中段系统消息
+- **WHEN** provider 适配档为 `system_messages = fold`，且会话中段出现 system/developer
+- **THEN** 该消息降级为 `user`，开头连续的系统消息保持不变
+
+#### Scenario: thinking 参数改形
+- **WHEN** provider 适配档为 `thinking = qwen`，请求含 `thinking.type` 或 `reasoning_effort`
+- **THEN** 上游收到顶层 `enable_thinking` 布尔值，`thinking` 字段被移除
+
+#### Scenario: 已知签名自愈
+- **WHEN** 上游返回 400 且错误体为 `developer is not one of ['system', 'assistant', 'user', 'tool', 'function']`
+- **THEN** 网关改写该请求并对同一 provider 重试一次，不标记凭据、不换号
+
+#### Scenario: 未知签名原样透传
+- **WHEN** 上游返回 400 且错误体不在签名表内
+- **THEN** 错误体原样返回客户端，不重试、不改写
+
+#### Scenario: 能力路由
+- **WHEN** provider 适配档为 `images = unsupported`（或该 provider 的模型映射 `input` 未包含 `image`）且请求含图片内容
+- **THEN** 该 provider 不参与本次选号；若没有其他候选则返回 503 `route_exhausted`
+
+#### Scenario: 模型兼容声明
+- **WHEN** 某模型由两个 provider 提供，其中一个 `developer_role = emulated`
+- **THEN** `GET /v1/models` 中该模型的 `compatibility.developer_role` 为 `emulated`
 
 ### Requirement: 请求体上限
 
@@ -193,8 +252,8 @@ provider 凭据的 `models` 清单为**必填**：清单非空且包含该 `mode
 - **THEN** 换号重发，客户端只收到最终成功响应
 
 #### Scenario: 请求级错误不换号
-- **WHEN** 上游返回 400
-- **THEN** 原样返回且不换号、不标记凭据
+- **WHEN** 上游返回 400（且错误体不在兼容签名表内）
+- **THEN** 原样返回且不换号、不标记凭据（兼容签名见「上游兼容适配」）
 
 #### Scenario: 全部失败
 - **WHEN** 所有候选凭据均返回 429
@@ -316,40 +375,50 @@ path 不属于任何已建模端点时（如 `/v1/files`、`/v1beta/*`、`/uploa
 
 ### Requirement: 会话粘性
 
-网关 MUST 按家族从请求中提取会话标识，并按 (路由, 模型, 会话标识) 维护**内存**粘性映射（滑动 TTL）：
+网关 MUST 按家族从请求中提取会话标识，并按 (路由, 模型, 会话标识) 维护**内存**「最后使用记录」（滑动 TTL）：
 
 - `/v1/responses`：`previous_response_id` → `conversation` → `prompt_cache_key` → `user`；
 - `/v1/chat/completions`：`prompt_cache_key` → `user`；
-- `/v1/messages`：请求体 `metadata.user_id`，缺失时 MUST NOT 建立粘性；
-- `/v1/messages/count_tokens`：MUST NOT 建立粘性（非生成端点，无会话语义）。
+- `/v1/messages`：请求体 `metadata.user_id`，缺失时 MUST NOT 记录；
+- `/v1/messages/count_tokens`：MUST NOT 记录（非生成端点，无会话语义）。
 
-承载凭据健康时 MUST 优先复用；换号成功后 MUST 更新为新凭据；换号未成功 MUST NOT 更新。
+**写**：任何策略下，成功承载（收到上游响应头）MUST 记录或更新为该 Provider；换号未成功 MUST NOT 更新。
+**读**：只有 `last_used` 策略 MUST 读取；其余策略 MUST NOT 读取，也 MUST NOT 因记录改变顺序。
+**服从档位**：仅当记录指向的凭据处于当前候选集合的最高档位时才生效；低于该档位时 MUST 视为未命中，且条目 MUST NOT 被删除。记录指向的凭据不健康、`priority = 0` 或不支持当前格式时 MUST 跳过并按策略顺序继续，记录 MUST NOT 被删除。
 
-粘性映射 MAY 由控制面以种子形式注入（启动时恢复）：种子条目 MUST 带过期时刻，已过期的条目 MUST 被忽略；MUST 只在本地无该 (路由, 模型, 会话标识) 记录时采用，MUST NOT 覆盖运行期已更新的映射。
+记录 MAY 由控制面以种子形式注入（启动时恢复）：种子条目 MUST 带过期时刻，已过期的条目 MUST 被忽略；MUST 只在本地无该 (路由, 模型, 会话标识) 记录时采用，MUST NOT 覆盖运行期已更新的记录。
 
 #### Scenario: 同会话复用
 - **WHEN** 某会话标识的请求由凭据 A 承载且 A 健康
-- **THEN** 同标识的后续请求仍优先由 A 承载
+- **THEN** 同标识的后续请求在 `last_used` 策略下仍优先由 A 承载
 
 #### Scenario: 换号跟随
-- **WHEN** 粘性凭据失效并换由 B 成功承载
-- **THEN** 该会话后续优先由 B 承载
+- **WHEN** 记录指向的凭据失效并换由 B 成功承载
+- **THEN** 该会话后续在 `last_used` 策略下优先由 B 承载
 
 #### Scenario: 重启后恢复
 - **WHEN** core 以包含该会话条目的种子启动，且条目未过期
-- **THEN** 该会话的首个请求优先由种子里的凭据承载
+- **THEN** 该会话的首个请求在 `last_used` 策略下优先由种子里的凭据承载
 
 #### Scenario: 过期种子被忽略
 - **WHEN** 种子里的条目 `expires_at` 早于当前时刻
-- **THEN** 该条目被丢弃，按无粘性处理
+- **THEN** 该条目被丢弃，按无记录处理
 
 #### Scenario: 不覆盖运行期数据
 - **WHEN** 运行期已把某会话更新为凭据 B，随后配置再次下发带有该会话的旧种子（凭据 A）
 - **THEN** 仍由 B 承载
 
 #### Scenario: Anthropic 会话键
-- **WHEN** 两个 `POST /v1/messages` 请求的 `metadata.user_id` 相同
+- **WHEN** 两个 `POST /v1/messages` 请求的 `metadata.user_id` 相同，策略为 `last_used`
 - **THEN** 后一个请求优先复用前一个的承接 Provider
+
+#### Scenario: 非 last_used 策略仍写入记录
+- **WHEN** 策略为 `round_robin`，某会话由凭据 B 成功承载
+- **THEN** 记录被写入或更新为 B，但本次及后续选号 MUST NOT 读取它
+
+#### Scenario: 记录不越过档位
+- **WHEN** 记录指向 `priority = 1` 的凭据，同模型存在健康的 `priority = 9` 凭据
+- **THEN** 先尝试 `priority = 9` 的凭据，记录条目 MUST NOT 被删除
 
 ### Requirement: 事件流
 
@@ -483,39 +552,60 @@ Provider 的模型清单 MUST 为 `{name, upstream}` 对象数组。`name` 是�
 
 ### Requirement: 路由选号策略
 
-每条路由 MUST 携带一个选号策略，取值为 `round_robin` / `uptime` / `latency` / `auto`；缺省 MUST 为 `round_robin`。策略由控制面随配置下发，变更 MUST 原子生效，MUST NOT 要求重启。
+每条路由 MUST 携带一个选号策略，取值为 `round_robin` / `last_used` / `latency` / `throughput` / `auto`；缺省 MUST 为 `round_robin`。策略由控制面随配置下发，变更 MUST 原子生效，MUST NOT 要求重启。
 
-| 策略 | 排序依据 |
-|---|---|
-| `round_robin` | 该 (路由, 模型) 的轮询计数器顺序；MUST NOT 打分 |
-| `uptime` | 档位分组后，档内按 可用性优先权重 + 指数 uptime 惩罚 排序 |
-| `latency` | 档位分组后，档内按 首字节时延优先权重 + 指数 uptime 惩罚 排序 |
-| `auto` | 档位分组后，档内按 两项权重加权 + 指数 uptime 惩罚 排序，并按 `explorationRate` 随机探索 |
+| 策略 | 档内排序依据 | 是否打分 | 是否读会话记录 |
+|---|---|---|---|
+| `round_robin` | 该 (路由, 模型) 的轮询计数器顺序 | 否 | 否 |
+| `last_used` | 该 (路由, 模型, 会话标识) 上次成功承载的 Provider 置顶，其余按轮询计数器顺序 | 否 | 是 |
+| `latency` | 首字节时延低者优先（`w_latency` 主导） | 是 | 否 |
+| `throughput` | 输出 token 速度高者优先（`w_throughput` 主导） | 是 | 否 |
+| `auto` | `uptime` / `latency` / `throughput` 三项加权 + 指数 uptime 惩罚，并按 `explorationRate` 随机探索 | 是 | 否 |
 
-**档位分组**：`priority` MUST NOT 以任何形式进入打分（不作惩罚项、不作权重）；候选 MUST 先按 `priority` 降序分档，档内再按上表排序依据排列（与「Provider 优先级（档位）」一致）。
+**档位是硬约束**：候选 MUST 先按 `priority` 降序分档，`priority` MUST NOT 进入打分（不作惩罚项、不作权重）；任何策略 MUST NOT 把低档位候选排在高档位候选之前。会话记录同样 MUST 服从档位（见「会话粘性」）。
 
-任一策略下，命中会话粘性且健康可用的凭据 MUST 置顶；粘性命中但不可用（不健康、格式不符、`priority = 0`）时 MUST 跳过并继续按策略顺序尝试。
+`last_used` 在无会话标识或无记录时 MUST 等同于 `round_robin`；`round_robin` MUST NOT 读取会话记录。`latency` / `throughput` / `auto` MUST NOT 读取会话记录。
 
-策略为 `round_robin` 时 `explorationRate` MUST NOT 生效（轮询本身已分散流量）。
+`round_robin` / `last_used` 下 `explorationRate`、`weights`、`thresholds` MUST NOT 生效（含权重和为 0 的回退判定），快照中的 `score` MUST 为 `null`。
 
 #### Scenario: 轮询保持默认行为
 - **WHEN** 路由未显式配置策略
-- **THEN** 按轮询计数器顺序选号，与引入本能力之前一致
+- **THEN** 按轮询计数器顺序选号，不使用会话记录，与「粘性置顶」修复前的差异仅在于不再受会话记录影响
+
+#### Scenario: 轮询不使用会话记录
+- **WHEN** 策略为 `round_robin`，某会话上次由凭据 B 承载，且同档位存在凭据 A（轮询顺序在前）
+- **THEN** 先尝试 A，MUST NOT 因会话记录把 B 置顶
+
+#### Scenario: 最后使用优先
+- **WHEN** 策略为 `last_used`，某会话上次由同档位的凭据 B 承载
+- **THEN** 该会话的后续请求先尝试 B，其余候选按轮询计数器顺序
+
+#### Scenario: 无会话标识回退轮询
+- **WHEN** 策略为 `last_used`，请求体不含任何会话标识字段
+- **THEN** 按轮询计数器顺序选号
+
+#### Scenario: 最后使用不越过档位
+- **WHEN** 策略为 `last_used`，会话记录指向 `priority = 1` 的凭据，而同模型存在健康的 `priority = 9` 凭据
+- **THEN** 先尝试 `priority = 9` 的凭据，MUST NOT 因会话记录先试 `priority = 1` 的凭据
 
 #### Scenario: 时延优先
 - **WHEN** 策略为 `latency`，两个健康凭据的 EWMA 首字节时延分别为 200ms 与 900ms
 - **THEN** 先尝试 200ms 的凭据
 
+#### Scenario: 吞吐优先
+- **WHEN** 策略为 `throughput`，两个健康凭据的 EWMA 输出 token 速度分别为 80/s 与 20/s
+- **THEN** 先尝试 80/s 的凭据
+
 #### Scenario: 可用性优先
-- **WHEN** 策略为 `uptime`，两个健康凭据的 EWMA 失败率分别为 0 与 0.3
-- **THEN** 先尝试失败率为 0 的凭据
+- **WHEN** 策略为 `auto`，两个健康凭据的 EWMA 失败率分别为 0 与 0.3，其余指标相同
+- **THEN** 先尝试失败率为 0 的凭据（`w_uptime` 主导）
 
 #### Scenario: 粘性优先于策略
-- **WHEN** 策略为 `latency` 且会话粘性命中一个健康凭据（时延不是最低）
-- **THEN** 先尝试该粘性凭据
+- **WHEN** 策略为 `last_used`，同一档位内两个健康凭据，会话记录命中其中时延不是最低的那个
+- **THEN** 先尝试该记录的凭据
 
 #### Scenario: 粘性不可用时跳过
-- **WHEN** 粘性命中的凭据 `priority = 0` 或不支持当前入站格式
+- **WHEN** 会话记录指向的凭据 `priority = 0`、不健康或不支持当前入站格式
 - **THEN** 跳过该凭据，按策略顺序继续
 
 ### Requirement: Provider 优先级（档位）
@@ -546,13 +636,14 @@ Provider 的 `weight`（权重）与 `sort_order`（排序）字段 MUST NOT 存
 
 ### Requirement: 选号指标
 
-数据面 MUST 为每个 Provider 凭据在**内存**中维护选号指标：首字节时延 EWMA 与失败率 EWMA。指标 MUST NOT 持久化、MUST NOT 读取数据库或配置文件。
+数据面 MUST 为每个 Provider 凭据在**内存**中维护选号指标：首字节时延 EWMA、失败率 EWMA 与输出 token 速度 EWMA。指标 MUST NOT 持久化、MUST NOT 读取数据库或配置文件。
 
 - 成功拿到上游响应头时 MUST 更新首字节时延与失败率（失败率向 0 收敛）；
-- 标记类失败（凭据级 401/403/429/5xx/传输失败）MUST 更新失败率（向 1 收敛），MUST NOT 更新首字节时延；
+- 标记类失败（凭据级 401/403/429/5xx/传输失败）MUST 更新失败率（向 1 收敛），MUST NOT 更新首字节时延与 token 速度；
 - 请求级错误（不标记凭据的 4xx）MUST NOT 计入任何指标；
-- 缺失指标（无样本，或距最后一次样本超过 30 分钟）MUST 使用默认值：`defaultUptime` 与 `defaultLatencyMs`；
-- 同一 Provider 的指标 MUST 在路由之间共享（凭据是全局健康判定的一部分），进程重启后清零。
+- 输出 token 速度 `tokens_per_sec = output_tokens / (duration_ms − ttft_ms)`，MUST 只在「生成端点、`output_tokens > 0`、`duration_ms > ttft_ms`」时采样；不满足时 MUST NOT 写入该指标，也 MUST NOT 增加该指标的样本数；
+- 缺失指标（无样本，或距最后一次样本超过 30 分钟）MUST 使用默认值：`defaultUptime`、`defaultLatencyMs` 与 `defaultTokensPerSec`；
+- 同一 Provider 的指标 MUST 在路由之间共享，进程重启后清零；token 速度 MUST NOT 由启动种子恢复（历史用量按 Provider 聚合不含 token 与生成时长）。
 
 #### Scenario: 成功样本更新时延
 - **WHEN** 某凭据成功返回首字节
@@ -560,37 +651,55 @@ Provider 的 `weight`（权重）与 `sort_order`（排序）字段 MUST NOT 存
 
 #### Scenario: 失败样本不影响时延
 - **WHEN** 某凭据返回 503
-- **THEN** 失败率上升，时延 EWMA 保持不变
+- **THEN** 失败率上升，时延 EWMA 与 token 速度 EWMA 保持不变
 
 #### Scenario: 请求级错误不计入
 - **WHEN** 某凭据返回不标记的 400
 - **THEN** 该凭据的指标不发生任何变化
 
+#### Scenario: 流式样本更新 token 速度
+- **WHEN** 某流式请求首字节耗时 300ms、总耗时 2300ms、上游 usage 报 `output_tokens = 200`
+- **THEN** 该凭据的 token 速度 EWMA 按 200 ÷ 2s = 100/s 更新
+
+#### Scenario: 无 usage 不采样
+- **WHEN** 某请求成功但响应不含 usage（`output_tokens` 缺失）
+- **THEN** token 速度 EWMA 与样本数均不变化
+
+#### Scenario: 非流式短尾不采样
+- **WHEN** 某请求 `duration_ms` 与 `ttft_ms` 之差 ≤ 0
+- **THEN** token 速度 MUST NOT 被采样
+
 #### Scenario: 陈旧指标
 - **WHEN** 某凭据最后一次样本在 31 分钟前
-- **THEN** 打分使用默认值，并把它标记为陈旧
+- **THEN** 打分使用默认值（含 `defaultTokensPerSec`），并把它标记为陈旧
 
 ### Requirement: 打分公式
 
-非 `round_robin` 策略 MUST 使用同一打分公式（越小越好）：
+打分策略（`latency` / `throughput` / `auto`）MUST 使用同一打分公式（越小越好）：
 
 ~~~txt
-score = (w_uptime/Σw)·uptimeRatio + (w_latency/Σw)·latencyRatio + uptimePenalty
+score = (w_uptime/Σw)·uptimeRatio + (w_latency/Σw)·latencyRatio
+      + (w_throughput/Σw)·throughputRatio + uptimePenalty
 
-uptimeRatio   = maxUptime / uptime − 1
-latencyRatio  = ttfb / minTtfb − 1
-uptimePenalty = uptime < uptimePenaltyThreshold
-              ? ((uptimePenaltyThreshold − uptime)/uptimePenaltyThreshold × 5)²
-              : 0
+uptimeRatio     = maxUptime / uptime − 1
+latencyRatio    = ttfb / minTtfb − 1
+throughputRatio = minThroughput / throughput − 1
+uptimePenalty   = uptime < uptimePenaltyThreshold
+                ? ((uptimePenaltyThreshold − uptime)/uptimePenaltyThreshold × 5)²
+                : 0
 ~~~
 
-各项含义：`uptime = (1 − failureRate) × 100`；`minTtfb` / `maxUptime` 取当前候选集合内的极值；缺失指标用默认值代入。
+各项含义：`uptime = (1 − failureRate) × 100`；`throughput` 为输出 token 速度（tokens/s）；`minTtfb` / `maxUptime` / `minThroughput` 取当前候选集合内的极值；缺失指标用默认值代入。
 
-默认权重与阈值：`uptime` 策略 `w_uptime=0.9 / w_latency=0.1`；`latency` 策略 `w_uptime=0.1 / w_latency=0.9`；`auto` 策略 `w_uptime=0.75 / w_latency=0.25`。`w_price` 与 `w_throughput` 本轮 MUST 恒为 0（本版本无价格与吞吐指标）。
+默认权重：`latency` 策略 `w_uptime=0.1 / w_latency=0.9 / w_throughput=0`；`throughput` 策略 `w_uptime=0.1 / w_latency=0 / w_throughput=0.9`；`auto` 策略 `w_uptime=0.5 / w_latency=0.25 / w_throughput=0.25`。`w_price` MUST 恒为 0（本版本无价格指标）。
 
 #### Scenario: 指数惩罚生效
 - **WHEN** 某候选 uptime = 80%，另一候选 99%
 - **THEN** 前者额外承担约 0.62 的惩罚项，可被后者反超
+
+#### Scenario: 吞吐主导
+- **WHEN** 策略为 `throughput`，两个候选 uptime 相同，token 速度分别为 80/s 与 20/s
+- **THEN** 前者分数更低（更优）
 
 #### Scenario: 分数不含档位
 - **WHEN** 两个候选指标相同但 `priority` 不同
@@ -598,15 +707,19 @@ uptimePenalty = uptime < uptimePenaltyThreshold
 
 ### Requirement: 打分回退与平局打散
 
-权重和 `Σw ≤ 0` 时 MUST 回退 `round_robin`，MUST NOT 报错。分数相同（或候选全部无样本）时 MUST 按该 (路由, 模型) 的轮询计数器打散，保证公平与探索。
+打分策略权重和 `Σw ≤ 0` 时 MUST 回退 `round_robin`，MUST NOT 报错。分数相同（或候选全部无样本）时 MUST 按该 (路由, 模型) 的轮询计数器打散，保证公平与探索。
 
-`auto` 策略的 `explorationRate`（缺省 `0.01`）MUST 按比例随机跳过打分、改用轮询顺序，为冷启动提供样本；`round_robin` / `uptime` / `latency` 策略下该值 MUST NOT 生效。
+`auto` 策略的 `explorationRate`（缺省 `0.01`）MUST 按比例随机跳过打分、改用轮询顺序，为冷启动提供样本；`round_robin` / `last_used` / `latency` / `throughput` 策略下该值 MUST NOT 生效。
 
-阈值缺省：`uptimePenaltyThreshold=95`、`defaultUptime=100`、`defaultLatencyMs=1000`。
+阈值缺省：`uptimePenaltyThreshold=95`、`defaultUptime=100`、`defaultLatencyMs=1000`、`defaultTokensPerSec=30`。
 
 #### Scenario: 权重和为零回退轮询
-- **WHEN** `auto` 策略的两项权重都被配置为 0
+- **WHEN** `auto` 策略的三项权重都被配置为 0
 - **THEN** 按 `round_robin` 选号，不返回错误
+
+#### Scenario: 非打分策略不回退
+- **WHEN** 策略为 `last_used`，其权重字段被配置为 0
+- **THEN** 该配置 MUST NOT 触发回退，仍按 `last_used` 语义选号
 
 #### Scenario: 同分打散
 - **WHEN** 两个候选分数相同（或都无样本）
@@ -615,6 +728,10 @@ uptimePenalty = uptime < uptimePenaltyThreshold
 #### Scenario: 探索取样
 - **WHEN** `auto` 策略的 `explorationRate = 1`
 - **THEN** 每次请求都按轮询顺序选号（不按打分）
+
+#### Scenario: 缺少 token 速度样本
+- **WHEN** 某一候选无 token 速度样本，另一候选有
+- **THEN** 缺失方按 `defaultTokensPerSec` 代入参与打分
 
 ### Requirement: 选号策略的即时生效
 

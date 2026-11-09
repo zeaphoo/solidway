@@ -21,7 +21,8 @@ fn default_priority() -> i64 {
     1
 }
 
-/// 入站 API 格式。网关不做格式转换：请求格式必须与 Provider 的声明精确匹配。
+/// 入站 API 格式。网关不做**协议**转换（请求格式必须与 Provider 的声明精确匹配），
+/// 但允许按 provider 适配档做**表示层**归一化（见 [`crate::compat`]）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ApiFormat {
@@ -53,14 +54,23 @@ impl ApiFormat {
     }
 }
 
-/// 客户端模型名 → 上游模型 id 的映射。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// 客户端模型名 → 上游模型 id 的映射，可附带对外声明的模型元数据。
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModelMapping {
     /// 客户端可用模型名（路由、`/v1/models`、粘性键都用它）。
     pub name: String,
     /// 上游模型 id；为空时等同于 `name`（不改写请求体）。
     #[serde(default)]
     pub upstream: String,
+    /// 上下文档位（tokens）。同一模型由多个 provider 提供时对外取**最小值**。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
+    /// 最大输出 tokens；多 provider 同模型取最小值。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_output_tokens: Option<u64>,
+    /// 输入模态（`text` / `image` / `audio` / `file`）；多 provider 同模型取**交集**。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<Vec<String>>,
 }
 
 impl ModelMapping {
@@ -75,6 +85,67 @@ impl ModelMapping {
     /// 是否需要改写请求 / 响应中的 `model` 字段。
     pub fn rewrites(&self) -> bool {
         self.upstream_or_name() != self.name
+    }
+
+    /// 该映射声明的元数据（全空时为 `None`）。
+    pub fn limits(&self) -> Option<ModelLimits> {
+        let limits = ModelLimits {
+            context_window: self.context_window,
+            max_output_tokens: self.max_output_tokens,
+            input: self.input.clone(),
+        };
+        (!limits.is_empty()).then_some(limits)
+    }
+}
+
+/// 模型级元数据：`/v1/models` 对外声明用。
+///
+/// 同一模型可能由多个 provider 承载，对外声明取**保守交集**：数值取最小值、
+/// 模态取交集、未知（`None`）不覆盖已知。
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ModelLimits {
+    pub context_window: Option<u64>,
+    pub max_output_tokens: Option<u64>,
+    pub input: Option<Vec<String>>,
+}
+
+impl ModelLimits {
+    pub fn is_empty(&self) -> bool {
+        self.context_window.is_none() && self.max_output_tokens.is_none() && self.input.is_none()
+    }
+
+    /// 取更保守的一方。
+    pub fn intersect(&mut self, other: &Self) {
+        self.context_window = min_known(self.context_window, other.context_window);
+        self.max_output_tokens = min_known(self.max_output_tokens, other.max_output_tokens);
+        self.input = intersect_modalities(self.input.take(), other.input.as_deref());
+    }
+}
+
+fn min_known(left: Option<u64>, right: Option<u64>) -> Option<u64> {
+    match (left, right) {
+        (Some(left), Some(right)) => Some(left.min(right)),
+        (Some(value), None) | (None, Some(value)) => Some(value),
+        (None, None) => None,
+    }
+}
+
+fn intersect_modalities(
+    left: Option<Vec<String>>,
+    right: Option<&[String]>,
+) -> Option<Vec<String>> {
+    match (left, right) {
+        (Some(left), Some(right)) => {
+            let kept: Vec<String> = left
+                .into_iter()
+                .filter(|modality| right.iter().any(|other| other == modality))
+                .collect();
+            // 空交集说明没有共同的输入模态，保守声明为空集合。
+            Some(kept)
+        }
+        (Some(left), None) => Some(left),
+        (None, Some(right)) => Some(right.to_vec()),
+        (None, None) => None,
     }
 }
 
@@ -126,33 +197,43 @@ pub struct ApiKeyEntry {
 }
 
 /// 路由选号策略。
+///
+/// 档位（`priority`）是所有策略的硬约束：候选先按档位降序分组，策略只决定**档内**顺序。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SelectionStrategy {
-    /// 轮询（默认）：行为与引入策略之前一致。
+    /// 轮询（默认）：档内按轮询计数器，不使用会话记录。
     #[default]
     RoundRobin,
-    /// 可用性优先。
-    Uptime,
-    /// 首字节优先。
+    /// 最后使用优先：档内把该会话上次成功承载的 Provider 置顶，其余按轮询计数器。
+    LastUsed,
+    /// 响应快优先：档内按首字节时延打分。
     Latency,
+    /// 吞吐优先：档内按输出 token 速度打分。
+    Throughput,
     /// 综合加权（含按比例随机探索）。
+    ///
+    /// `uptime` 策略（可用性优先）已并入本策略（`w_uptime = 0.5`），
+    /// 别名保证存量配置与回滚仍能解析。
+    #[serde(alias = "uptime")]
     Auto,
 }
 
 impl SelectionStrategy {
-    pub const ALL: [SelectionStrategy; 4] = [
+    pub const ALL: [SelectionStrategy; 5] = [
         SelectionStrategy::RoundRobin,
-        SelectionStrategy::Uptime,
+        SelectionStrategy::LastUsed,
         SelectionStrategy::Latency,
+        SelectionStrategy::Throughput,
         SelectionStrategy::Auto,
     ];
 
     pub fn as_str(self) -> &'static str {
         match self {
             SelectionStrategy::RoundRobin => "round_robin",
-            SelectionStrategy::Uptime => "uptime",
+            SelectionStrategy::LastUsed => "last_used",
             SelectionStrategy::Latency => "latency",
+            SelectionStrategy::Throughput => "throughput",
             SelectionStrategy::Auto => "auto",
         }
     }
@@ -161,12 +242,30 @@ impl SelectionStrategy {
         Self::ALL.into_iter().find(|s| s.as_str() == raw)
     }
 
-    /// 该策略的默认权重（`price` / `throughput` 本轮恒为 0）。
+    /// 宽松解析：额外接受已删除的 `uptime`（映射为 `auto`），供存量数据读取。
+    pub fn parse_legacy(raw: &str) -> Option<Self> {
+        if raw == "uptime" {
+            return Some(SelectionStrategy::Auto);
+        }
+        Self::parse(raw)
+    }
+
+    /// 是否用打分公式排序（决定权重 / 阈值 / 探索率是否生效）。
+    pub fn is_scoring(self) -> bool {
+        matches!(
+            self,
+            SelectionStrategy::Latency | SelectionStrategy::Throughput | SelectionStrategy::Auto
+        )
+    }
+
+    /// 该策略的默认权重（`price` 无指标，恒为 0）。
+    ///
+    /// 非打分策略返回全 0：权重对它们不生效，也不参与「权重和为 0 回退轮询」。
     pub fn default_weights(self) -> SelectionWeights {
         match self {
-            SelectionStrategy::RoundRobin | SelectionStrategy::Uptime => SelectionWeights {
-                uptime: 0.9,
-                latency: 0.1,
+            SelectionStrategy::RoundRobin | SelectionStrategy::LastUsed => SelectionWeights {
+                uptime: 0.0,
+                latency: 0.0,
                 price: 0.0,
                 throughput: 0.0,
             },
@@ -176,11 +275,17 @@ impl SelectionStrategy {
                 price: 0.0,
                 throughput: 0.0,
             },
+            SelectionStrategy::Throughput => SelectionWeights {
+                uptime: 0.1,
+                latency: 0.0,
+                price: 0.0,
+                throughput: 0.9,
+            },
             SelectionStrategy::Auto => SelectionWeights {
-                uptime: 0.75,
+                uptime: 0.5,
                 latency: 0.25,
                 price: 0.0,
-                throughput: 0.0,
+                throughput: 0.25,
             },
         }
     }
@@ -202,7 +307,7 @@ pub struct SelectionWeights {
     pub latency: f64,
     /// 本轮保留字段，MUST 为 0（无价格指标）。
     pub price: f64,
-    /// 本轮保留字段，MUST 为 0（无吞吐指标）。
+    /// 输出 token 速度权重。
     pub throughput: f64,
 }
 
@@ -228,6 +333,8 @@ pub struct SelectionThresholds {
     pub default_uptime: f64,
     /// 无指标时的兜底首字节时延（毫秒）。
     pub default_latency_ms: f64,
+    /// 无指标时的兜底输出 token 速度（tokens/s）。
+    pub default_tokens_per_sec: f64,
     /// `auto` 策略的随机探索比例（0..=1）。
     pub exploration_rate: f64,
 }
@@ -238,6 +345,7 @@ impl Default for SelectionThresholds {
             uptime_penalty: 95.0,
             default_uptime: 100.0,
             default_latency_ms: 1000.0,
+            default_tokens_per_sec: 30.0,
             exploration_rate: 0.0,
         }
     }
@@ -271,18 +379,18 @@ impl RouteSelection {
         }
     }
 
-    /// 实际生效的策略：权重和 ≤ 0 时回退轮询。
+    /// 实际生效的策略：打分策略的权重和 ≤ 0 时回退轮询。
     pub fn effective_strategy(&self) -> SelectionStrategy {
-        if self.strategy != SelectionStrategy::RoundRobin && self.weights.sum() <= 0.0 {
+        if self.falls_back() {
             SelectionStrategy::RoundRobin
         } else {
             self.strategy
         }
     }
 
-    /// 是否因权重全为 0 而回退。
+    /// 是否因权重全为 0 而回退（只有打分策略会被判定）。
     pub fn falls_back(&self) -> bool {
-        self.strategy != SelectionStrategy::RoundRobin && self.weights.sum() <= 0.0
+        self.strategy.is_scoring() && self.weights.sum() <= 0.0
     }
 }
 

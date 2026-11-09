@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node --test src/lib/providerEndpoint.test.mjs src/lib/avatar.test.mjs src/lib/onboardingSteps.test.mjs src/lib/accessSnippets.test.mjs"
+    "test": "node --test src/lib/providerEndpoint.test.mjs src/lib/avatar.test.mjs src/lib/onboardingSteps.test.mjs src/lib/accessSnippets.test.mjs src/lib/selectionDefaults.test.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

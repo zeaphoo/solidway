@@ -46,10 +46,27 @@ fn models_to_json(models: &[ModelMapping]) -> String {
                 } else {
                     upstream.to_string()
                 },
+                // 元数据随映射一起保存；空值不落库（对外声明时省略该字段）。
+                context_window: mapping.context_window,
+                max_output_tokens: mapping.max_output_tokens,
+                input: normalize_modalities(mapping.input.as_deref()),
             })
         })
         .collect();
     serde_json::to_string(&cleaned).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// 归一化输入模态：trim + 小写 + 去重；空集合视为未声明。
+fn normalize_modalities(raw: Option<&[String]>) -> Option<Vec<String>> {
+    let raw = raw?;
+    let mut out: Vec<String> = Vec::new();
+    for value in raw {
+        let value = value.trim().to_ascii_lowercase();
+        if !value.is_empty() && !out.contains(&value) {
+            out.push(value);
+        }
+    }
+    (!out.is_empty()).then_some(out)
 }
 
 /// 校验并去重入站 API 格式；未定义取值 → 400。
@@ -1208,6 +1225,7 @@ pub async fn create_provider_key(
             .map(|name| ModelMapping {
                 name: name.clone(),
                 upstream: name.clone(),
+                ..ModelMapping::default()
             })
             .collect();
         // `models_to_json` 负责 trim / 去重 / 丢弃空名，写入 0 条即失败。
@@ -1459,6 +1477,8 @@ pub struct ProviderSelectionView {
     pub health: String,
     pub ttfb_ms: Option<f64>,
     pub uptime_pct: Option<f64>,
+    /// 输出 token 速度（tokens/s）；无吞吐样本时为 `null`。
+    pub tokens_per_sec: Option<f64>,
     pub samples: u64,
     pub stale: bool,
     pub score: Option<f64>,
@@ -1499,6 +1519,7 @@ async fn selection_view(state: &AppState, route: &routes::Route) -> Result<Selec
                 health: p.health,
                 ttfb_ms: p.ttfb_ms,
                 uptime_pct: p.uptime_pct,
+                tokens_per_sec: p.tokens_per_sec,
                 samples: p.samples,
                 stale: p.stale,
                 score: p.score,
@@ -1533,10 +1554,12 @@ pub async fn put_selection_strategy(
 ) -> Result<Json<SelectionStrategyView>> {
     let route = ensure_active_owned_route(&state, &user, &id).await?;
     let Some(strategy) = solidway_core::SelectionStrategy::parse(req.strategy.trim()) else {
-        return Err(ApiError::InvalidRequest(format!(
-            "strategy 非法: {}（应为 round_robin / uptime / latency / auto）",
-            req.strategy
-        )));
+        let reason = if req.strategy.trim() == "uptime" {
+            "strategy 已删除: uptime（可用性优先已并入 auto，请改用 auto）"
+        } else {
+            "strategy 非法（应为 round_robin / last_used / latency / throughput / auto）"
+        };
+        return Err(ApiError::InvalidRequest(reason.to_string()));
     };
     crate::selection::validate(&req.config)?;
     let config = crate::selection::to_json(&req.config);
@@ -1557,6 +1580,79 @@ pub async fn put_selection_strategy(
         .await?
         .ok_or(ApiError::NotFound)?;
     Ok(Json(selection_view(&state, &route).await?))
+}
+
+#[derive(Serialize)]
+pub struct AffinityEntryView {
+    pub model: String,
+    pub session: String,
+    pub provider_id: String,
+    pub expires_at: i64,
+}
+
+#[derive(Deserialize, Default)]
+pub struct AffinityQuery {
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub session: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct ClearAffinityResult {
+    pub removed: usize,
+}
+
+/// 单路由会话记录的最大返回条数。
+const AFFINITY_LIST_LIMIT: usize = 200;
+
+/// `GET /api/routes/{id}/affinity`：该路由未过期的会话记录（只读）。
+///
+/// 记录在所有策略下都会写入，但只有 `last_used` 读取，因此对其它策略而言
+/// 这里是诊断信息。数据面未装配时返回空数组。
+pub async fn list_route_affinity(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<String>,
+) -> Result<Json<Vec<AffinityEntryView>>> {
+    let route = routes::get_by_owner(&state.pool, &id, &user.0.id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
+    let core = state.core.read().expect("core lock").clone();
+    let Some(core) = core else {
+        return Ok(Json(Vec::new()));
+    };
+    Ok(Json(
+        core.list_affinity(&route.id, AFFINITY_LIST_LIMIT)
+            .await
+            .into_iter()
+            .map(|seed| AffinityEntryView {
+                model: seed.model,
+                session: seed.session,
+                provider_id: seed.provider_id,
+                expires_at: seed.expires_at,
+            })
+            .collect(),
+    ))
+}
+
+/// `DELETE /api/routes/{id}/affinity`：清除会话记录（可限定模型 + 会话标识）。
+pub async fn clear_route_affinity(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(id): Path<String>,
+    Query(query): Query<AffinityQuery>,
+) -> Result<Json<ClearAffinityResult>> {
+    let route = ensure_owned_route(&state, &user, &id).await?;
+    let core = state.core.read().expect("core lock").clone();
+    let removed = match core {
+        Some(core) => {
+            core.clear_affinity(&route.id, query.model.as_deref(), query.session.as_deref())
+                .await
+        }
+        None => 0,
+    };
+    Ok(Json(ClearAffinityResult { removed }))
 }
 
 // ---------------- API Keys ----------------
@@ -3184,19 +3280,21 @@ mod tests {
         let raw = vec![
             ModelMapping {
                 name: " gpt-5 ".to_string(),
-                upstream: String::new(),
+                ..ModelMapping::default()
             },
             ModelMapping {
                 name: "gpt-5".to_string(),
                 upstream: "gpt-5".to_string(),
+                ..ModelMapping::default()
             },
             ModelMapping {
                 name: String::new(),
-                upstream: String::new(),
+                ..ModelMapping::default()
             },
             ModelMapping {
                 name: "gpt-5-mini".to_string(),
                 upstream: "gpt-5-mini-2025".to_string(),
+                ..ModelMapping::default()
             },
         ];
         let json = models_to_json(&raw);
@@ -3210,13 +3308,46 @@ mod tests {
                 ModelMapping {
                     name: "gpt-5".to_string(),
                     upstream: "gpt-5".to_string(),
+                    ..ModelMapping::default()
                 },
                 ModelMapping {
                     name: "gpt-5-mini".to_string(),
                     upstream: "gpt-5-mini-2025".to_string(),
+                    ..ModelMapping::default()
                 },
             ]
         );
+    }
+
+    #[test]
+    fn model_metadata_survives_persistence() {
+        let raw = vec![ModelMapping {
+            name: "deepseek-flash".to_string(),
+            upstream: "deepseek-v4.1-flash-1017".to_string(),
+            context_window: Some(1_000_000),
+            max_output_tokens: Some(384_000),
+            input: Some(vec![
+                " Text ".to_string(),
+                "image".to_string(),
+                "text".to_string(),
+            ]),
+        }];
+        let json = models_to_json(&raw);
+        let parsed = models_from_json(&json);
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].context_window, Some(1_000_000));
+        assert_eq!(parsed[0].max_output_tokens, Some(384_000));
+        // 模态 trim + 小写 + 去重。
+        assert_eq!(
+            parsed[0].input.as_deref(),
+            Some(&["text".to_string(), "image".to_string()][..])
+        );
+        // 未声明的元数据不落库，保持旧数据的 JSON 形状不变。
+        let bare = models_to_json(&[ModelMapping {
+            name: "gpt-5".to_string(),
+            ..ModelMapping::default()
+        }]);
+        assert_eq!(bare, r#"[{"name":"gpt-5","upstream":"gpt-5"}]"#);
     }
 
     #[test]

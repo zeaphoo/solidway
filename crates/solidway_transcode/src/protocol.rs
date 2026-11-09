@@ -67,6 +67,8 @@ impl Support {
 pub struct RequestCaps {
     pub system_prompt: Support,
     pub developer_role: Support,
+    /// 会话中段（非开头）的系统消息。
+    pub system_messages: Support,
     pub images: Support,
     pub documents: Support,
     pub audio_input: Support,
@@ -90,6 +92,7 @@ impl RequestCaps {
     pub const DEFAULT: Self = Self {
         system_prompt: Support::Native,
         developer_role: Support::Native,
+        system_messages: Support::Native,
         images: Support::Native,
         documents: Support::Native,
         audio_input: Support::Native,
@@ -186,6 +189,7 @@ macro_rules! narrow_caps {
 narrow_caps!(RequestCaps {
     system_prompt,
     developer_role,
+    system_messages,
     images,
     documents,
     audio_input,

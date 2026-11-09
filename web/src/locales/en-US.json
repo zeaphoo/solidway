@@ -180,6 +180,9 @@
     "modelUnrename": "Remove public name",
     "modelsEmpty": "No models yet; empty means this provider serves nothing",
     "modelsHint": "By default the model ID doubles as the public name; click the pencil to set a separate one (left = upstream model ID, right = name clients see).",
+    "modelContextWindow": "Context window (tokens, optional)",
+    "modelMaxOutput": "Max output (tokens, optional)",
+    "modelInput": "Input modalities, e.g. text,image (optional)",
     "fetchModels": "Fetch models",
     "fetching": "Fetching…",
     "fetchNeedsKey": "Fill in the API key first",
@@ -609,7 +612,7 @@
       "setup": "Setup",
       "ops": "Operations",
       "opsHint": "Admins only, can be done later",
-    "opsProgress": "{{done}} of {{total}} done"
+      "opsProgress": "{{done}} of {{total}} done"
     },
     "concepts": {
       "title": "Three objects to know",
@@ -722,43 +725,64 @@
   },
   "selection": {
     "title": "Selection strategy",
-    "hint": "Decides which provider is tried first inside this route. It only changes ordering, never request or response bytes.",
+    "hint": "Decides which Provider is tried first within a route. Affects ordering only, never request or response bytes. Every strategy groups candidates by priority tier first: a higher tier always precedes a lower one.",
     "strategy": "Strategy",
     "strategies": {
       "round_robin": "Round robin",
-      "uptime": "Availability first",
-      "latency": "Lowest TTFT",
-      "auto": "Weighted"
+      "last_used": "Last used first",
+      "latency": "Fastest response",
+      "throughput": "Highest throughput",
+      "auto": "Weighted blend"
     },
     "strategyHints": {
-      "round_robin": "Spreads requests across healthy candidates; identical to the behavior before strategies existed.",
-      "uptime": "Prefers providers with the lowest failure rate (weights 0.9 / 0.1).",
-      "latency": "Prefers the lowest time to first byte (weights 0.9 / 0.1).",
-      "auto": "Scores availability and TTFT together, with a small random exploration."
+      "round_robin": "Rotates among healthy candidates within a tier; never reads session records.",
+      "last_used": "Reuses the session's last successful Provider (same tier only), falling back to round robin.",
+      "latency": "Prefers the lower time-to-first-byte within a tier (latency weight 0.9).",
+      "throughput": "Prefers the higher output token rate within a tier (throughput weight 0.9).",
+      "auto": "Blends uptime (0.5), latency (0.25) and throughput (0.25), with a little random exploration."
     },
     "weights": {
       "uptime": "Uptime weight",
-      "latency": "TTFT weight"
+      "latency": "TTFB weight",
+      "throughput": "Throughput weight"
     },
     "explorationRate": "Exploration rate",
-    "explorationHint": "0 disables exploration; when exploring, round-robin order is used so new providers gather samples.",
-    "advanced": "Advanced: penalty and fallbacks",
+    "explorationHint": "0 disables exploration; when exploring, selection follows round-robin order to collect samples.",
+    "advanced": "Advanced: penalty threshold and defaults",
     "uptimePenalty": "Penalty threshold (%)",
     "defaultUptime": "Default uptime (%)",
-    "defaultLatency": "Default TTFT (ms)",
-    "fixedWeights": "This strategy uses fixed weights (uptime {{uptime}} / TTFT {{latency}}).",
-    "fallbackHint": "Both weights are 0, so round robin is used.",
-    "metrics": "Current metrics (in-memory, refreshed every 10s)",
-    "ttfb": "TTFT",
+    "defaultLatency": "Default latency (ms)",
+    "defaultTokensPerSec": "Default throughput (token/s)",
+    "fixedWeights": "This strategy uses fixed weights (uptime {{uptime}} / TTFB {{latency}} / throughput {{throughput}}).",
+    "fallbackHint": "All three weights are 0, so selection falls back to round robin.",
+    "metrics": "Live metrics (data-plane memory, refreshed every 10s)",
+    "ttfb": "TTFB",
     "uptime": "Uptime",
+    "tokensPerSec": "token/s",
     "samples": "Samples",
     "score": "Score",
-    "metricState": "State",
-    "stateMissing": "no samples",
-    "stateStale": "stale",
-    "disabled": "disabled",
-    "noProviders": "This route has no provider that can take part in selection yet.",
-    "saved": "Strategy applied — no restart needed"
+    "metricState": "Metric state",
+    "health": "Health",
+    "stateMissing": "No samples",
+    "stateFresh": "Fresh",
+    "stateStale": "Stale",
+    "disabled": "Disabled",
+    "noProviders": "This route has no Provider that can be selected yet.",
+    "saved": "Strategy applied, no restart needed",
+    "affinity": {
+      "title": "Session records",
+      "count": "{{count}} record(s)",
+      "empty": "No session records",
+      "hint": "Records are written under every strategy, but only \"Last used first\" reads them.",
+      "model": "Model",
+      "session": "Session",
+      "provider": "Provider",
+      "expiresAt": "Expires at",
+      "clearOne": "Clear",
+      "clearAll": "Clear all",
+      "cleared": "Cleared; the next request re-selects by tier",
+      "diagnosticOnly": "The current strategy does not read session records; this list is diagnostics only."
+    }
   },
   "incidents": {
     "pageTitle": "Provider incidents",

@@ -15,7 +15,11 @@ pub const STALE_SECS: i64 = 30 * 60;
 struct Stats {
     ttfb_ms: f64,
     failure_rate: f64,
+    /// 输出 token 速度（tokens/s）EWMA。
+    tokens_per_sec: f64,
     samples: u64,
+    /// 吞吐样本数（与总样本数分开：非流式 / 无 usage 的请求不产生吞吐样本）。
+    throughput_samples: u64,
     last_sample_at: i64,
 }
 
@@ -24,6 +28,8 @@ struct Stats {
 pub struct MetricValue {
     pub ttfb_ms: f64,
     pub uptime_pct: f64,
+    /// 无吞吐样本时为 `None`（由打分用兜底值代入）。
+    pub tokens_per_sec: Option<f64>,
 }
 
 /// 展示用的指标快照（含陈旧标记，无样本时数值为空）。
@@ -31,6 +37,7 @@ pub struct MetricValue {
 pub struct StatsView {
     pub ttfb_ms: Option<f64>,
     pub uptime_pct: Option<f64>,
+    pub tokens_per_sec: Option<f64>,
     pub samples: u64,
     pub stale: bool,
 }
@@ -40,6 +47,7 @@ impl StatsView {
         Self {
             ttfb_ms: None,
             uptime_pct: None,
+            tokens_per_sec: None,
             samples: 0,
             stale: true,
         }
@@ -50,6 +58,8 @@ impl StatsView {
 #[derive(Debug, Default)]
 pub struct Metrics {
     inner: RwLock<HashMap<String, Stats>>,
+    /// 兼容适配改写次数（按 provider），仅用于观测。
+    compat: RwLock<HashMap<String, u64>>,
 }
 
 impl Metrics {
@@ -81,6 +91,25 @@ impl Metrics {
         stats.last_sample_at = now;
     }
 
+    /// 输出 token 速度样本（tokens/s）：只由满足采样条件的请求调用。
+    ///
+    /// 口径由调用方保证（生成端点、`output_tokens > 0`、`duration > ttft`）。
+    /// 不计入 `samples`：吞吐样本数与「有多少次尝试」是两回事。
+    pub fn record_throughput(&self, provider_id: &str, tokens_per_sec: f64, now: i64) {
+        if !tokens_per_sec.is_finite() || tokens_per_sec <= 0.0 {
+            return;
+        }
+        let mut guard = self.inner.write().expect("metrics lock");
+        let stats = guard.entry(provider_id.to_string()).or_default();
+        stats.tokens_per_sec = if stats.throughput_samples == 0 {
+            tokens_per_sec
+        } else {
+            (1.0 - ALPHA) * stats.tokens_per_sec + ALPHA * tokens_per_sec
+        };
+        stats.throughput_samples += 1;
+        stats.last_sample_at = now;
+    }
+
     /// 启动种子：只在本地无样本时采用；`last_sample_at` 取当前时刻，
     /// 否则按整点对齐的历史均值会被立刻判定为陈旧。
     ///
@@ -98,7 +127,9 @@ impl Metrics {
             Stats {
                 ttfb_ms,
                 failure_rate: failure_rate.clamp(0.0, 1.0),
+                tokens_per_sec: 0.0,
                 samples,
+                throughput_samples: 0,
                 last_sample_at: now,
             },
         );
@@ -125,6 +156,7 @@ impl Metrics {
         Some(MetricValue {
             ttfb_ms: stats.ttfb_ms,
             uptime_pct: (1.0 - stats.failure_rate) * 100.0,
+            tokens_per_sec: (stats.throughput_samples > 0).then_some(stats.tokens_per_sec),
         })
     }
 
@@ -137,15 +169,37 @@ impl Metrics {
         StatsView {
             ttfb_ms: Some(stats.ttfb_ms),
             uptime_pct: Some((1.0 - stats.failure_rate) * 100.0),
+            tokens_per_sec: (stats.throughput_samples > 0).then_some(stats.tokens_per_sec),
             samples: stats.samples,
             stale: now.saturating_sub(stats.last_sample_at) > STALE_SECS,
         }
+    }
+
+    /// 记录一次兼容适配改写（预检或自愈重试）。
+    pub fn record_compat(&self, provider_id: &str) {
+        let mut guard = self.compat.write().expect("metrics lock");
+        *guard.entry(provider_id.to_string()).or_insert(0) += 1;
+    }
+
+    /// 某 provider 的兼容适配改写累计次数。
+    pub fn compat_rewrites(&self, provider_id: &str) -> u64 {
+        self.compat
+            .read()
+            .expect("metrics lock")
+            .get(provider_id)
+            .copied()
+            .unwrap_or(0)
     }
 
     /// 丢弃不再存在的 provider 的指标。
     pub fn retain(&self, keep: impl Fn(&str) -> bool) {
         let mut guard = self.inner.write().expect("metrics lock");
         guard.retain(|id, _| keep(id));
+        drop(guard);
+        self.compat
+            .write()
+            .expect("metrics lock")
+            .retain(|id, _| keep(id));
     }
 }
 
@@ -196,6 +250,44 @@ mod tests {
         let metrics = Metrics::new();
         assert!(metrics.value("nope", 1000).is_none());
         assert_eq!(metrics.view("nope", 1000), StatsView::missing());
+    }
+
+    #[test]
+    fn throughput_samples_converge_and_do_not_touch_uptime() {
+        let metrics = Metrics::new();
+        metrics.record_success("p1", 300, 1000);
+        assert_eq!(metrics.value("p1", 1000).unwrap().tokens_per_sec, None);
+
+        metrics.record_throughput("p1", 100.0, 1001);
+        let value = metrics.value("p1", 1001).expect("value");
+        assert!((value.tokens_per_sec.unwrap() - 100.0).abs() < f64::EPSILON);
+        assert!((value.uptime_pct - 100.0).abs() < 1e-9);
+
+        // EWMA：0.8×100 + 0.2×50 = 90
+        metrics.record_throughput("p1", 50.0, 1002);
+        let value = metrics.value("p1", 1002).expect("value");
+        assert!((value.tokens_per_sec.unwrap() - 90.0).abs() < 1e-9);
+        // 吞吐样本不计入总样本数
+        assert_eq!(metrics.view("p1", 1002).samples, 1);
+    }
+
+    #[test]
+    fn failure_does_not_touch_throughput() {
+        let metrics = Metrics::new();
+        metrics.record_success("p1", 300, 1000);
+        metrics.record_throughput("p1", 120.0, 1001);
+        metrics.record_failure("p1", 1002);
+        let value = metrics.value("p1", 1002).expect("value");
+        assert!((value.tokens_per_sec.unwrap() - 120.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn non_positive_throughput_is_ignored() {
+        let metrics = Metrics::new();
+        metrics.record_success("p1", 300, 1000);
+        metrics.record_throughput("p1", 0.0, 1001);
+        metrics.record_throughput("p1", f64::NAN, 1001);
+        assert_eq!(metrics.view("p1", 1001).tokens_per_sec, None);
     }
 
     #[test]

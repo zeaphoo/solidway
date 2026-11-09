@@ -1015,6 +1015,7 @@ async fn insert_provider(state: &solidway_api::AppState, route_id: &str, seed: &
                     .map(|name| solidway_core::ModelMapping {
                         name: name.clone(),
                         upstream: name.clone(),
+                        ..Default::default()
                     })
                     .collect::<Vec<_>>(),
             )
@@ -1211,14 +1212,26 @@ impl Harness {
     }
 
     /// 用同一份 data_root 重启（模拟进程重启），返回新客户端与新的 core 句柄。
-    pub async fn restart(&self, _extra: &str) -> (RawClient, Arc<Core>) {
-        let (base_url, core) = assemble(&self.api).await;
+    pub async fn restart(&self, _extra: &str) -> (RawClient, Arc<Core>) {        let (base_url, core) = assemble(&self.api).await;
         (RawClient::new(&base_url), core)
     }
 
     /// 数据库文件路径。
     pub fn db_path(&self) -> PathBuf {
         self.data_root.join("solidway.db")
+    }
+
+    /// 改路由选号策略并立即下发数据面（会话记录相关测试用）。
+    ///
+    /// 会话记录只在 `last_used` 策略下读取，其余策略一律不读。
+    pub async fn set_strategy(&self, route_id: &str, strategy: &str) {
+        sqlx::query("UPDATE routes SET selection_strategy = ?1 WHERE id = ?2")
+            .bind(strategy)
+            .bind(route_id)
+            .execute(&self.api.state().pool)
+            .await
+            .expect("update selection strategy");
+        self.api.state().sync_core_best_effort().await;
     }
 
     /// 以 admin 登录并返回可直接放进 `cookie` 头的会话串。

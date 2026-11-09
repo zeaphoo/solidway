@@ -108,6 +108,10 @@ pub fn api_router(state: AppState) -> Router<AppState> {
             get(handlers::get_selection_strategy).put(handlers::put_selection_strategy),
         )
         .route(
+            "/routes/{id}/affinity",
+            get(handlers::list_route_affinity).delete(handlers::clear_route_affinity),
+        )
+        .route(
             "/routes/{id}/provider-keys",
             get(handlers::list_provider_keys).post(handlers::create_provider_key),
         )

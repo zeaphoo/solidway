@@ -42,3 +42,33 @@ llmgateway 的选号是加权打分（price / uptime / throughput / latency + pr
 - 打分公式已按「归一化 ratio + 惩罚项」定型：后续加价格/吞吐只需新增一个 ratio 与权重，不需要改候选过滤与换号逻辑。
 - 缓存型上游（prompt cache）与探索的交互暂未处理：`auto` 的探索请求会绕过打分，可能打掉缓存命中；若成为问题，可在 P2 用会话粘性抑制（现有粘性已置顶，故影响有限）。
 - 指标随进程重启清零，长尾问题（如每日一次的抖动）不会被记住；这是换取"数据面零持久化"的代价。
+
+## 修订记录
+
+### 2026-10-31：策略集重设计（5 值）+ 吞吐指标 + 会话记录降级为策略
+
+**变更**
+
+1. **策略集**改为 `round_robin`（默认）/ `last_used` / `latency` / `throughput` / `auto`；删除 `uptime`（可用性优先），其语义并入 `auto`（`w_uptime` 默认 0.5）。存量数据由迁移 `0002_selection_strategy_redesign.sql` 改写为 `auto`，读取侧对遗留 `uptime` 宽松解析为 `auto`（防回滚），写入接口 422 拒绝该值。
+2. **会话粘性降级为策略 `last_used`**：取消「任何策略下粘性置顶」的全局规则。会话记录在**所有**策略下都会写入（成功承载即刷新），但**只有 `last_used` 读取**；`round_robin` / `latency` / `throughput` / `auto` 一律不读。
+3. **会话记录服从档位**：记录指向的凭据只有在其 `priority` 等于当前候选最高档位时才置顶，跨档位命中视为未命中（条目保留）。这修掉「高档位被一次失败永久晾着」的缺陷。
+4. **新增输出 token 速度指标**：`output_tokens ÷ (总耗时 − 首字节耗时)`，α = 0.2 EWMA，30 分钟陈旧；仅在生成端点、`output_tokens > 0` 且总耗时大于首字节耗时时采样。启用 `w_throughput`，新增 `throughputRatio = minThroughput / throughput − 1` 与兜底值 `defaultTokensPerSec`（默认 30）。
+5. **`auto` 默认权重**改为 uptime 0.5 / latency 0.25 / throughput 0.25；`latency` 0.1/0.9/0、`throughput` 0.1/0/0.9。
+
+**动机**
+
+- 生产现象：`priority = 9` 的 Provider 只剩 1 个失败样本且长期「陈旧」，`priority = 1` 的 Provider 持续承载 —— 会话粘性跨档位把高档位永久锁死，且用户不可见。
+- 「策略 + 粘性开关」的正交设计让用户选了「轮询」却得到「粘性优先的轮询」，语义不可预期；把粘性收进一个策略值后，策略是唯一变量。
+
+**被否决方案**
+
+- **新增 `priority`（严格压满）策略**：档位已是所有策略的第一排序键，`round_robin` 本来就「档位优先、受限才降档」；与 `round_robin` 的实际差异只剩「同档内均摊 vs 固定压第一个」，而后者用不同档位（9 / 8）即可表达。新增策略等于给同一件事提供两套语义。
+- **`selection_config.affinity` 开关**：粘性成为策略值后该开关失去意义，不再引入。
+- **保留 `uptime` 独立策略**：它与 `latency` / `throughput` 同构（都是「某权重主导的打分」），保留会让策略列表退化成权重预设清单；指数 uptime 惩罚对所有打分策略依旧生效，可用性不会被忽略。
+- **吞吐指标进启动种子**：`usage_attempt_bucket` 只有 per-provider 请求数 / 成功数 / 时延和，没有 per-provider token 与生成时长，无法聚合；重启后吞吐清零，用兜底值过渡。
+
+**后果**
+
+- 默认策略仍是 `round_robin`，但**不再粘性**（缺陷修复，记 CHANGELOG Fixed）；前缀缓存的亲和收益需显式选 `last_used` 才保留。
+- 非流式请求大多不满足吞吐采样条件（尾段接近 0ms），`throughput` 策略在纯非流式场景下会退化到「档位 + 同分打散」；这是有意的（宁可无样本用兜底值，也不要把噪声写进 EWMA）。
+- 重启后吞吐指标清零，`throughput` 策略在样本攒够前等价于「档位 + 轮询」。

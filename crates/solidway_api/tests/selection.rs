@@ -56,7 +56,9 @@ async fn default_strategy_is_round_robin() {
     assert_eq!(body["strategy"], "round_robin");
     assert_eq!(body["config"], json!({}));
     assert_eq!(body["resolved"]["fallback"], false);
-    assert_eq!(body["resolved"]["weights"]["uptime"], 0.9);
+    // 非打分策略不带权重（轮询不用打分，也不参与「权重为 0 回退」）。
+    assert_eq!(body["resolved"]["weights"]["uptime"], 0.0);
+    assert_eq!(body["resolved"]["weights"]["throughput"], 0.0);
     assert!(body["providers"].is_array());
 }
 
@@ -96,6 +98,32 @@ async fn invalid_strategy_and_weights_are_rejected() {
     let unknown = put_selection(&harness, &cookie, &route_id, json!({ "strategy": "price" })).await;
     assert_eq!(unknown.status, 422, "{}", unknown.text());
 
+    // 已删除的 uptime 策略：拒绝并提示改用 auto。
+    let removed = put_selection(&harness, &cookie, &route_id, json!({ "strategy": "uptime" })).await;
+    assert_eq!(removed.status, 422, "{}", removed.text());
+    assert!(removed.text().contains("auto"), "{}", removed.text());
+
+    // 吞吐权重现在是可写的（不再恒为 0）。
+    let throughput = put_selection(
+        &harness,
+        &cookie,
+        &route_id,
+        json!({ "strategy": "auto", "config": { "weights": { "throughput": 0.4 } } }),
+    )
+    .await;
+    assert_eq!(throughput.status, 200, "{}", throughput.text());
+    assert_eq!(throughput.json()["resolved"]["weights"]["throughput"], 0.4);
+
+    // 兜底吞吐必须为正。
+    let bad_default = put_selection(
+        &harness,
+        &cookie,
+        &route_id,
+        json!({ "strategy": "auto", "config": { "thresholds": { "default_tokens_per_sec": 0 } } }),
+    )
+    .await;
+    assert_eq!(bad_default.status, 422, "{}", bad_default.text());
+
     let price = put_selection(
         &harness,
         &cookie,
@@ -134,7 +162,7 @@ async fn zero_weights_are_allowed_and_report_fallback() {
         &harness,
         &cookie,
         &route_id,
-        json!({ "strategy": "auto", "config": { "weights": { "uptime": 0, "latency": 0 } } }),
+        json!({ "strategy": "auto", "config": { "weights": { "uptime": 0, "latency": 0, "throughput": 0 } } }),
     )
     .await;
     assert_eq!(response.status, 200, "{}", response.text());
@@ -245,4 +273,87 @@ async fn provider_priority_is_validated_and_stored() {
         .await;
     assert_eq!(disabled.status, 200, "{}", disabled.text());
     assert_eq!(disabled.json()["status"], "inactive");
+}
+
+#[tokio::test]
+async fn throughput_strategy_has_its_own_weights() {
+    let harness = Harness::two_providers("selection-throughput", "").await;
+    let cookie = harness.admin_cookie().await;
+    let route_id = create_route(&harness, &cookie, "s6").await;
+
+    let response = put_selection(&harness, &cookie, &route_id, json!({ "strategy": "throughput" })).await;
+    assert_eq!(response.status, 200, "{}", response.text());
+    let body = response.json();
+    assert_eq!(body["resolved"]["weights"]["throughput"], 0.9);
+    assert_eq!(body["resolved"]["weights"]["latency"], 0.0);
+    assert_eq!(body["resolved"]["weights"]["uptime"], 0.1);
+    assert_eq!(body["resolved"]["thresholds"]["default_tokens_per_sec"], 30.0);
+}
+
+#[tokio::test]
+async fn provider_rows_expose_tokens_per_sec() {
+    let harness = Harness::two_providers("selection-tps", "").await;
+    let cookie = harness.admin_cookie().await;
+    // 用种子路由（自带两个 Provider），新建路由没有 Provider。
+    let body = get_selection(&harness, &cookie, "r-main").await.json();
+    let rows = body["providers"].as_array().expect("providers");
+    assert!(!rows.is_empty(), "应有 Provider 行");
+    // 无吞吐样本时为 null（字段必须存在）。
+    assert!(rows.iter().all(|row| row.get("tokens_per_sec").is_some()));
+}
+
+#[tokio::test]
+async fn affinity_records_are_listed_and_cleared() {
+    let harness = Harness::two_providers("selection-affinity", "").await;
+    harness.mocks.a.set_fallback(common::MockResponse::ok("gpt-5"));
+    harness.mocks.b.set_fallback(common::MockResponse::ok("gpt-5"));
+    harness.set_strategy("r-main", "last_used").await;
+    let cookie = harness.admin_cookie().await;
+
+    // 建立一条会话记录。
+    let request = ClientRequest::post_json(
+        "/v1/chat/completions",
+        &json!({
+            "model": "gpt-5",
+            "prompt_cache_key": "rec-sess",
+            "messages": [{"role": "user", "content": "hi"}]
+        }),
+    )
+    .bearer(common::TENANT_KEY);
+    assert_eq!(harness.client.send(request).await.status, 200);
+
+    let listed = harness
+        .client
+        .send(
+            ClientRequest::new("GET", "/api/routes/r-main/affinity").header("cookie", &cookie),
+        )
+        .await;
+    assert_eq!(listed.status, 200, "{}", listed.text());
+    let rows = listed.json();
+    let rows = rows.as_array().expect("array");
+    assert_eq!(rows.len(), 1, "{rows:?}");
+    assert_eq!(rows[0]["session"], "rec-sess");
+    assert_eq!(rows[0]["model"], "gpt-5");
+
+    // 按模型 + 会话清除。
+    let cleared = harness
+        .client
+        .send(
+            ClientRequest::new(
+                "DELETE",
+                "/api/routes/r-main/affinity?model=gpt-5&session=rec-sess",
+            )
+            .header("cookie", &cookie),
+        )
+        .await;
+    assert_eq!(cleared.status, 200, "{}", cleared.text());
+    assert_eq!(cleared.json()["removed"], 1);
+
+    let after = harness
+        .client
+        .send(
+            ClientRequest::new("GET", "/api/routes/r-main/affinity").header("cookie", &cookie),
+        )
+        .await;
+    assert_eq!(after.json().as_array().unwrap().len(), 0);
 }

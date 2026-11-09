@@ -8,9 +8,26 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`last_used`（最后使用优先）选号策略**：同一会话复用上次成功承载的 Provider（仅同档位内生效），未命中回退轮询。会话记录在**所有**策略下写入，但只有该策略读取 —— 轮询、时延、吞吐、综合加权一律不再受它影响。
+- **`throughput`（吞吐优先）选号策略与指标**：数据面内存新增「输出 token 速度」EWMA（`output_tokens ÷ (总耗时 − 首字节耗时)`，仅生成端点且 `output_tokens > 0` 时采样），参与打分并新增兜底值 `defaults.defaultTokensPerSec`（默认 30）；策略与指标表都新增对应列（`token/s`）。
+- **路由会话记录接口**：`GET /api/routes/{id}/affinity`（未过期记录）与 `DELETE /api/routes/{id}/affinity`（可按模型 + 会话清除），控制台「选号策略」区块下新增会话记录列表与清除操作。
+
 ### Changed
 
+- **选号策略集改为 5 值**：`round_robin` / `last_used` / `latency` / `throughput` / `auto`；`weights.throughput` 由「必须为 0」改为 `[0, 1]` 可配置；`auto` 默认权重改为可用性 0.5 / 时延 0.25 / 吞吐 0.25。控制台策略按钮同步为五项，指标表新增 `token/s` 列。
+- **指标表状态列拆分**：原「状态」列把指标新鲜度与健康状态合成一格（陈旧会盖住健康态），现拆为「指标状态」（新鲜 / 陈旧 / 无样本）与「健康」（正常 / 冷却中 / 已退役）两列。
 - **许可证改为 Apache-2.0**：由 AGPL-3.0-only 改为 Apache-2.0（宽松许可、含明确专利授权；不再有「把修改版作为网络服务提供须开源」的义务）。新增仓库根 `NOTICE`，deb / rpm 包与 Windows 便携版说明同步更新；`Cargo.toml` 的 `license` 字段改为 `Apache-2.0`。
+
+### Fixed
+
+- **高优先级 Provider 被会话粘性永久晾置**：粘性命中的凭据此前无条件置顶，导致高档位首次失败后会话被固定在低档位（TTL 24 小时且跨重启恢复），高档位再不被尝试。现会话记录只在当前候选最高档位内生效，跨档位命中被忽略（条目保留），高档位恢复后自动重新优先。
+- **`round_robin` 不再使用会话记录**：默认策略的行为回到「纯档位 + 档内轮询」。
+
+### Removed
+
+- **`uptime`（可用性优先）选号策略已删除**：语义并入 `auto`（`w_uptime` 默认 0.5）。存量路由由迁移 `0002_selection_strategy_redesign.sql` 改写为 `auto`；写入接口对 `uptime` 返回 422 并提示改用 `auto`。
 
 ## [0.5.0-rc.2] - 2026-10-30
 

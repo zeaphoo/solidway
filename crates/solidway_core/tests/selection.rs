@@ -1,4 +1,4 @@
-//! 选号策略的集成测试：默认轮询、时延/可用性优先、优先级、回退、陈旧与快照。
+//! 选号策略的集成测试：轮询 / 最后使用 / 时延 / 吞吐 / 综合加权、优先级档位、回退、陈旧与快照。
 
 mod common;
 
@@ -28,6 +28,8 @@ fn spec(id: &str, models: &[&str]) -> ProviderSpec {
         api_formats: vec![ApiFormat::ChatCompletions],
         auth_scheme: "bearer".to_string(),
         priority: 1,
+        options: None,
+        models_meta: None,
     }
 }
 
@@ -37,7 +39,7 @@ fn config(strategy: SelectionStrategy, providers: Vec<ProviderSpec>) -> solidway
     cfg.providers.iter_mut().for_each(|p| {
         p.models = [ModelMapping {
             name: "gpt-5".to_string(),
-            upstream: String::new(),
+            ..ModelMapping::default()
         }]
         .to_vec()
     });
@@ -64,9 +66,21 @@ async fn order(
     model: &str,
     format: ApiFormat,
 ) -> Vec<String> {
+    order_with_affinity(registry, selector, model, format, None).await
+}
+
+async fn order_with_affinity(
+    registry: &Registry,
+    selector: &Selector,
+    model: &str,
+    format: ApiFormat,
+    affinity: Option<&str>,
+) -> Vec<String> {
     let route = registry.route("r1").expect("route");
     let probing = probing();
-    let pick = selector.pick(route, model, format, None, &probing).await;
+    let pick = selector
+        .pick(route, model, format, affinity, &probing)
+        .await;
     pick.order()
 }
 
@@ -109,9 +123,10 @@ async fn latency_strategy_prefers_the_faster_provider() {
 }
 
 #[tokio::test]
-async fn uptime_strategy_prefers_the_healthier_provider() {
+async fn auto_strategy_prefers_the_healthier_provider() {
+    // `uptime` 策略已并入 `auto`（w_uptime 默认 0.5）。
     let cfg = config(
-        SelectionStrategy::Uptime,
+        SelectionStrategy::Auto,
         vec![spec("p1", &["gpt-5"]), spec("p2", &["gpt-5"])],
     );
     let (registry, metrics, selector, _health) = selector(&cfg);
@@ -125,6 +140,90 @@ async fn uptime_strategy_prefers_the_healthier_provider() {
 
     let order = order(&registry, &selector, "gpt-5", ApiFormat::ChatCompletions).await;
     assert_eq!(order[0], "p1", "{order:?}");
+}
+
+#[tokio::test]
+async fn throughput_strategy_prefers_the_faster_tokens() {
+    let cfg = config(
+        SelectionStrategy::Throughput,
+        vec![spec("p1", &["gpt-5"]), spec("p2", &["gpt-5"])],
+    );
+    let (registry, metrics, selector, _health) = selector(&cfg);
+    let now = epoch_secs(std::time::SystemTime::now());
+    metrics.record_success("p1", 200, now);
+    metrics.record_success("p2", 200, now);
+    metrics.record_throughput("p1", 20.0, now);
+    metrics.record_throughput("p2", 120.0, now);
+
+    for _ in 0..3 {
+        let order = order(&registry, &selector, "gpt-5", ApiFormat::ChatCompletions).await;
+        assert_eq!(order[0], "p2", "{order:?}");
+    }
+}
+
+#[tokio::test]
+async fn round_robin_ignores_affinity() {
+    let cfg = config(
+        SelectionStrategy::RoundRobin,
+        vec![spec("p1", &["gpt-5"]), spec("p2", &["gpt-5"])],
+    );
+    let (registry, _metrics, selector, _health) = selector(&cfg);
+
+    let mut seen = Vec::new();
+    for _ in 0..4 {
+        let order = order_with_affinity(
+            &registry,
+            &selector,
+            "gpt-5",
+            ApiFormat::ChatCompletions,
+            Some("p2"),
+        )
+        .await;
+        seen.push(order[0].clone());
+    }
+    // 轮询从不读取会话记录：首项必须交替。
+    assert!(seen.contains(&"p1".to_string()), "{seen:?}");
+    assert!(seen.contains(&"p2".to_string()), "{seen:?}");
+}
+
+#[tokio::test]
+async fn last_used_pins_the_recorded_provider() {
+    let cfg = config(
+        SelectionStrategy::LastUsed,
+        vec![spec("p1", &["gpt-5"]), spec("p2", &["gpt-5"])],
+    );
+    let (registry, _metrics, selector, _health) = selector(&cfg);
+
+    for _ in 0..3 {
+        let order = order_with_affinity(
+            &registry,
+            &selector,
+            "gpt-5",
+            ApiFormat::ChatCompletions,
+            Some("p2"),
+        )
+        .await;
+        assert_eq!(order[0], "p2", "{order:?}");
+    }
+}
+
+#[tokio::test]
+async fn last_used_does_not_cross_tiers() {
+    let mut high = spec("p1", &["gpt-5"]);
+    high.priority = 9;
+    let cfg = config(SelectionStrategy::LastUsed, vec![high, spec("p2", &["gpt-5"])]);
+    let (registry, _metrics, selector, _health) = selector(&cfg);
+
+    // 记录指向低档位 p2：本次必须忽略，仍先试高档位 p1。
+    let order = order_with_affinity(
+        &registry,
+        &selector,
+        "gpt-5",
+        ApiFormat::ChatCompletions,
+        Some("p2"),
+    )
+    .await;
+    assert_eq!(order, vec!["p1".to_string(), "p2".to_string()], "{order:?}");
 }
 
 #[tokio::test]
@@ -222,6 +321,7 @@ async fn zero_weights_fall_back_to_round_robin() {
     let mut selection = cfg.routes[0].selection;
     selection.weights.uptime = 0.0;
     selection.weights.latency = 0.0;
+    selection.weights.throughput = 0.0;
     selection.thresholds.exploration_rate = 0.0;
     assert!(selection.falls_back());
     assert_eq!(selection.effective_strategy(), SelectionStrategy::RoundRobin);
@@ -337,4 +437,67 @@ async fn engine_records_metrics_and_exposes_snapshot() {
     assert!(snapshot[0].score.is_some());
 
     assert!(core.selection_snapshot("nope", None).await.is_none());
+}
+
+#[tokio::test]
+async fn throughput_is_sampled_over_the_generation_window() {
+    // 首字节先到、响应体 200ms 后才到 → duration − ttft ≈ 200ms；
+    // 100 个 output token / 0.2s ≈ 500 tokens/s。
+    let mock = spawn_mock(Behavior::SlowBody {
+        status: 200,
+        body: r#"{"id":"x","usage":{"prompt_tokens":10,"completion_tokens":100}}"#.to_string(),
+        delay: Duration::from_millis(200),
+    })
+    .await;
+    let cfg = base_config(
+        vec![provider("a", mock.base_url(), &["gpt-5"])],
+        fast_options(),
+    );
+    let (base, core) = spawn_core(cfg).await;
+
+    let resp = post(
+        &base,
+        "/v1/chat/completions",
+        Some(CLIENT_KEY),
+        serde_json::json!({"model": "gpt-5"}),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+
+    let snapshot = core
+        .selection_snapshot("r1", Some("gpt-5"))
+        .await
+        .expect("snapshot");
+    let tps = snapshot[0].tokens_per_sec.expect("应记录吞吐样本");
+    assert!((tps - 500.0).abs() < 150.0, "100 token / 0.2s = 500/s，实际 {tps}");
+}
+
+#[tokio::test]
+async fn throughput_is_skipped_without_usage() {
+    let mock = spawn_mock(Behavior::SlowBody {
+        status: 200,
+        body: r#"{"id":"x"}"#.to_string(),
+        delay: Duration::from_millis(120),
+    })
+    .await;
+    let cfg = base_config(
+        vec![provider("a", mock.base_url(), &["gpt-5"])],
+        fast_options(),
+    );
+    let (base, core) = spawn_core(cfg).await;
+
+    let resp = post(
+        &base,
+        "/v1/chat/completions",
+        Some(CLIENT_KEY),
+        serde_json::json!({"model": "gpt-5"}),
+    )
+    .await;
+    assert_eq!(resp.status(), 200);
+
+    let snapshot = core
+        .selection_snapshot("r1", Some("gpt-5"))
+        .await
+        .expect("snapshot");
+    assert!(snapshot[0].tokens_per_sec.is_none(), "无 usage 不得采样");
 }

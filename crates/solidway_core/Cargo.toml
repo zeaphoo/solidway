@@ -7,6 +7,7 @@ license.workspace = true
 # 数据面引擎：纯内存。
 # 硬约束：不得依赖 sqlx / 数据库驱动，不得读取配置文件。
 [dependencies]
+solidway-transcode = { path = "../solidway_transcode" }
 axum.workspace = true
 tokio.workspace = true
 serde.workspace = true

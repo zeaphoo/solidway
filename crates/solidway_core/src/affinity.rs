@@ -143,6 +143,48 @@ impl Affinity {
             .filter(|entry| entry.expires_at > now)
             .count()
     }
+
+    /// 列举某路由的未过期条目（按过期时刻倒序，最多 `limit` 条）。
+    ///
+    /// 供管理面展示与会话诊断用（与 [`Self::export`] 的区别：只取单路由）。
+    pub async fn list(&self, route: &str, limit: usize) -> Vec<crate::config::AffinitySeed> {
+        let now = epoch_secs(SystemTime::now());
+        let entries = self.entries.lock().await;
+        let mut items: Vec<(i64, crate::config::AffinitySeed)> = entries
+            .iter()
+            .filter(|((route_id, _, _), entry)| route_id == route && entry.expires_at > now)
+            .map(|((route_id, model, session), entry)| {
+                (
+                    entry.expires_at,
+                    crate::config::AffinitySeed {
+                        route_id: route_id.clone(),
+                        model: model.clone(),
+                        session: session.clone(),
+                        provider_id: entry.provider_id.clone(),
+                        expires_at: entry.expires_at,
+                    },
+                )
+            })
+            .collect();
+        items.sort_by_key(|item| std::cmp::Reverse(item.0));
+        items.truncate(limit);
+        items.into_iter().map(|(_, seed)| seed).collect()
+    }
+
+    /// 删除某路由的粘性条目：给出 `(model, session)` 时只删该组合，否则清空该路由。
+    ///
+    /// 返回实际删除的条数（含已过期但未清理的条目）。
+    pub async fn remove(&self, route: &str, model_and_session: Option<(&str, &str)>) -> usize {
+        let mut entries = self.entries.lock().await;
+        let before = entries.len();
+        match model_and_session {
+            Some((model, session)) => {
+                entries.remove(&key(route, model, session));
+            }
+            None => entries.retain(|(route_id, _, _), _| route_id != route),
+        }
+        before - entries.len()
+    }
 }
 
 /// 组装粘性键。
@@ -153,6 +195,32 @@ fn key(route: &str, model: &str, session: &str) -> Key {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn list_is_scoped_to_route_and_sorted() {
+        let affinity = Affinity::new(Duration::from_secs(600));
+        affinity.remember("r1", "m1", "s1", "p-a").await;
+        affinity.remember("r1", "m2", "s2", "p-b").await;
+        affinity.remember("r2", "m1", "s1", "p-c").await;
+        let listed = affinity.list("r1", 10).await;
+        assert_eq!(listed.len(), 2);
+        assert!(listed.iter().all(|item| item.route_id == "r1"));
+        assert_eq!(affinity.list("r1", 1).await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn remove_by_pair_and_by_route() {
+        let affinity = Affinity::new(Duration::from_secs(600));
+        affinity.remember("r1", "m1", "s1", "p-a").await;
+        affinity.remember("r1", "m2", "s2", "p-b").await;
+        affinity.remember("r2", "m1", "s1", "p-c").await;
+
+        assert_eq!(affinity.remove("r1", Some(("m1", "s1"))).await, 1);
+        assert_eq!(affinity.len().await, 2);
+        assert_eq!(affinity.remove("r1", None).await, 1);
+        assert_eq!(affinity.len().await, 1);
+        assert_eq!(affinity.remove("nope", None).await, 0);
+    }
 
     #[tokio::test]
     async fn miss_returns_none() {

@@ -20,7 +20,8 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::affinity::Affinity;
-use crate::config::{AffinitySeed, ApiFormat, CoreConfig, CoreOptions};
+use crate::compat::{self, Profile};
+use crate::config::{AffinitySeed, ApiFormat, CoreConfig, CoreOptions, SelectionStrategy};
 use crate::decode::{BodyDecoder, ContentEncoding, decode_bytes};
 use crate::event::{
     AccessEvent, AttemptEvent, CompletionEvent, CompletionOutcome, CoreEvent, EventBus,
@@ -222,7 +223,7 @@ fn models_response(route: &RouteRuntime) -> Response {
     let data: Vec<Value> = models
         .iter()
         .map(|model| {
-            json!({
+            let mut item = json!({
                 "id": model,
                 "object": "model",
                 "created": 0,
@@ -230,7 +231,41 @@ fn models_response(route: &RouteRuntime) -> Response {
                 "type": "model",
                 "display_name": model,
                 "created_at": "1970-01-01T00:00:00Z",
-            })
+            });
+            // 对外声明取该模型所有可服务 provider 的**交集**（更保守的一方）。
+            // 只是给能读它的客户端做兼容判断用的提示，网关不依赖客户端据此调整行为。
+            if let Some(compatibility) = route_compatibility(route, model) {
+                item["compatibility"] = compatibility;
+            }
+            // 模型元数据（上下文档位 / 最大输出 / 输入模态）：多 provider 取保守交集。
+            if let Some(limits) = route.model_limits(model) {
+                if let Some(context) = limits.context_window {
+                    item["context_length"] = json!(context);
+                    item["context_window"] = json!(context);
+                }
+                if let Some(output) = limits.max_output_tokens {
+                    item["max_output_tokens"] = json!(output);
+                }
+                // OpenRouter 风格的 `top_provider`：有多少报多少。
+                if limits.context_window.is_some() || limits.max_output_tokens.is_some() {
+                    let mut top = serde_json::Map::new();
+                    if let Some(context) = limits.context_window {
+                        top.insert("context_length".to_string(), json!(context));
+                    }
+                    if let Some(output) = limits.max_output_tokens {
+                        top.insert("max_completion_tokens".to_string(), json!(output));
+                    }
+                    item["top_provider"] = Value::Object(top);
+                }
+                if let Some(input) = &limits.input {
+                    item["input_modalities"] = json!(input);
+                    item["architecture"] = json!({
+                        "input_modalities": input,
+                        "output_modalities": ["text"],
+                    });
+                }
+            }
+            item
         })
         .collect();
     axum::Json(json!({
@@ -241,6 +276,28 @@ fn models_response(route: &RouteRuntime) -> Response {
         "last_id": models.last(),
     }))
     .into_response()
+}
+
+/// 某模型在该路由内的对外兼容声明：所有可服务 provider 适配档的交集。
+///
+/// 没有任何可服务 `chat_completions` 的 provider 时返回 `None`（该模型不是 chat 模型）。
+fn route_compatibility(route: &RouteRuntime, model: &str) -> Option<Value> {
+    let mut merged: Option<Profile> = None;
+    for index in route.providers_for_model(model) {
+        let provider = route.provider(*index);
+        if !provider.enabled
+            || !provider.serves_model(model)
+            || !provider.api_formats.contains(&ApiFormat::ChatCompletions)
+        {
+            continue;
+        }
+        match merged.as_mut() {
+            Some(profile) => profile.intersect(&provider.compat),
+            None => merged = Some(provider.compat),
+        }
+    }
+    let profile = merged?;
+    serde_json::to_value(profile).ok()
 }
 
 fn method_not_allowed(allow: &'static str) -> Response {
@@ -299,6 +356,8 @@ pub struct Core {
     probe_count: Arc<AtomicU64>,
     /// 选号指标（内存，不落库）。
     metrics: Arc<Metrics>,
+    /// 兼容适配自愈学习表（内存；配置下发即清空）。
+    compat: Arc<compat::Learned>,
     /// Google Service Account 实例缓存（按 provider id）。
     gcp_accounts:
         tokio::sync::Mutex<std::collections::HashMap<String, Arc<gcp_auth::CustomServiceAccount>>>,
@@ -373,6 +432,7 @@ impl Core {
             client,
             probe_count: Arc::new(AtomicU64::new(0)),
             metrics,
+            compat: Arc::new(compat::Learned::new()),
             gcp_accounts: tokio::sync::Mutex::new(std::collections::HashMap::new()),
         }))
     }
@@ -402,6 +462,8 @@ impl Core {
         };
         *self.state.write().expect("state lock") = Arc::new(state);
         self.gcp_accounts.lock().await.clear();
+        // 学习条目绑定的是具体上游行为：配置变了就重新探测。
+        self.compat.clear();
         Ok(())
     }
 
@@ -414,9 +476,35 @@ impl Core {
         self.probe_count.load(Ordering::Relaxed)
     }
 
+    /// 某 provider 的兼容适配改写累计次数（预检 + 自愈重试，仅供观测）。
+    pub fn compat_rewrites(&self, provider_id: &str) -> u64 {
+        self.metrics.compat_rewrites(provider_id)
+    }
+
     /// 只读导出未过期的会话粘性条目（进程收尾时落盘用）。
     pub async fn export_affinity(&self, limit: usize) -> Vec<AffinitySeed> {
         self.affinity.export(limit).await
+    }
+
+    /// 只读列出某路由的未过期会话记录（管理面展示与会话诊断用）。
+    pub async fn list_affinity(&self, route_id: &str, limit: usize) -> Vec<AffinitySeed> {
+        self.affinity.list(route_id, limit).await
+    }
+
+    /// 删除某路由的会话记录：给出 `(model, session)` 时只删该组合。
+    ///
+    /// 返回实际删除的条数；进程收尾时 `export_affinity` 会以内存现状覆盖落盘。
+    pub async fn clear_affinity(
+        &self,
+        route_id: &str,
+        model: Option<&str>,
+        session: Option<&str>,
+    ) -> usize {
+        let pair = match (model, session) {
+            (Some(model), Some(session)) => Some((model, session)),
+            _ => None,
+        };
+        self.affinity.remove(route_id, pair).await
     }
 
     /// 选号快照：某路由下每个 provider 的指标与当前分数（控制面只读展示用）。
@@ -569,9 +657,13 @@ impl Core {
         // 凭据类 query 参数（`key` / `api_key`）绝不外传；其余原样保留。
         let query = clean_query(uri.query().unwrap_or_default());
 
-        let affinity_provider = match &payload.session {
-            Some(session) => self.affinity.lookup(&route.id, model, session).await,
-            None => None,
+        // 会话记录只在 `last_used` 策略下读取（`lookup` 会续期 TTL，
+        // 其余策略必须完全不碰）；写入与策略无关，成功承载即刷新。
+        let affinity_provider = match (&payload.session, route.selection.effective_strategy()) {
+            (Some(session), SelectionStrategy::LastUsed) => {
+                self.affinity.lookup(&route.id, model, session).await
+            }
+            _ => None,
         };
         self.spawn_probes(state, route, model).await;
         let pick = state
@@ -588,6 +680,8 @@ impl Core {
         let mut tried: HashSet<String> = HashSet::new();
         let mut attempts = 0u32;
         let mut last_failure: Option<LastFailure> = None;
+        // 请求需要的表示层能力：用于跳过声明不支持的 provider（能力路由）。
+        let features = compat::features(&raw);
 
         for provider_id in pick.order() {
             if !tried.insert(provider_id.clone()) {
@@ -599,8 +693,20 @@ impl Core {
             let Some(upstream_model) = provider.upstream_model(model) else {
                 continue;
             };
+            // 能力路由：适配档或模型元数据声明不支持所需媒体（如图片）的 provider
+            // 直接跳过，不占指标与冷却。
+            let lacks_capability = !provider.compat.serves(&features)
+                || (features.images && !provider.accepts_modality(model, "image"));
+            if lacks_capability {
+                tracing::debug!(
+                    provider = %provider_id,
+                    model,
+                    "provider 的适配档声明不支持请求所需能力，跳过"
+                );
+                continue;
+            }
             attempts += 1;
-            let attempt_start = Instant::now();
+            let mut attempt_start = Instant::now();
             let rewrite_alias = (upstream_model != model).then(|| model.to_string());
             // 模型别名生效时只改请求体顶层 `model`；同名完全不碰。
             let (mut body, path) = match &rewrite_alias {
@@ -610,6 +716,27 @@ impl Core {
                 ),
                 None => (raw.clone(), client_path.clone()),
             };
+            // 兼容适配（预检）：按 provider 适配档 + 自愈学习到的规则改写表示层。
+            // 适配档为 native 且无学习条目时完全不动字节。
+            let learned = self
+                .compat
+                .rules(&provider_id, model, api_format, Instant::now());
+            // 适配规则只描述 chat_completions 的身体形状；其它家族一律原样透传。
+            let chat_shape = matches!(target, Inbound::ChatCompletions);
+            if chat_shape
+                && (!provider.compat.is_native() || !learned.is_empty())
+                && let Some(rewrite) = compat::normalize(&body, &provider.compat, &learned)
+            {
+                self.metrics.record_compat(&provider_id);
+                tracing::info!(
+                    request_id = %request_id,
+                    provider = %provider_id,
+                    model,
+                    rules = ?rewrite.rule_ids(),
+                    "上游兼容适配：请求体已按适配档改写"
+                );
+                body = Bytes::from(rewrite.body);
+            }
             // 上游路径 = 凭据上的 `path_template`（含路径参数 / model / action / endpoint）渲染结果；
             // 没有模板时回退到 `{base_url}{家族后缀}`。路径参数属于凭据，不能来自客户端 URL —— 这是池化的前提。
             let rendered = render_target(
@@ -621,7 +748,8 @@ impl Core {
                 upstream_model,
             );
             body = rendered.body;
-            if want_stream_usage {
+            // 适配档声明不接受 `stream_options` 时不补（否则会被严格上游拒绝）。
+            if want_stream_usage && provider.compat.allows_stream_options() {
                 body = ensure_stream_usage(&body);
             }
             let base = provider.base_url.trim_end_matches('/');
@@ -630,10 +758,65 @@ impl Core {
                 None => upstream_url(base, &path, query.as_deref(), family),
             };
 
-            match self
-                .attempt(state, &provider, method, url, headers, body)
-                .await
-            {
+            // 自愈重试：命中已知的表示层不兼容签名时，应用最小规则后重试同一 provider 一次。
+            // 只在 400 且未标记 provider、且尚未重试过时触发；不换号、不计失败。
+            let mut compat_retry_used = false;
+            let mut body = body;
+            let result = loop {
+                let attempt_result = self
+                    .attempt(state, &provider, method, url.clone(), headers, body.clone())
+                    .await;
+                if let Attempt::Failed {
+                    status,
+                    classification,
+                    body: failure_body,
+                    ..
+                } = &attempt_result
+                    && matches!(target, Inbound::ChatCompletions)
+                    && !classification.is_marked()
+                    && !compat_retry_used
+                    && let Some(prefix) = failure_body.as_ref().map(|tail| tail.prefix.as_slice())
+                    && let Some(rewrite) = compat::normalize(
+                        &body,
+                        &provider.compat,
+                        &compat::diagnose(status.as_u16(), prefix),
+                    )
+                {
+                    self.metrics.record_compat(&provider_id);
+                    self.compat.remember(
+                        &provider_id,
+                        model,
+                        api_format,
+                        &rewrite.rules,
+                        Instant::now(),
+                    );
+                    tracing::info!(
+                        request_id = %request_id,
+                        provider = %provider_id,
+                        model,
+                        status = status.as_u16(),
+                        rules = ?rewrite.rule_ids(),
+                        "上游兼容签名命中：按需改写请求体并重试同一 provider"
+                    );
+                    self.emit_attempt(
+                        &request_id,
+                        &route.id,
+                        model,
+                        &provider_id,
+                        Some(status.as_u16()),
+                        Some("compat_rewrite".to_string()),
+                        attempt_start.elapsed().as_millis() as u64,
+                    );
+                    attempts += 1;
+                    compat_retry_used = true;
+                    // 重试的 TTFB 只统计改写后那一次，避免污染选号指标。
+                    attempt_start = Instant::now();
+                    body = Bytes::from(rewrite.body);
+                    continue;
+                }
+                break attempt_result;
+            };
+            match result {
                 Attempt::Reached(upstream) => {
                     let status = upstream.status.as_u16();
                     self.emit_attempt(
@@ -682,6 +865,7 @@ impl Core {
                         model: model.to_string(),
                         provider_id,
                         started,
+                        ttfb_ms: ttft,
                         generation,
                     };
                     let alias = rewrite_alias.map(|alias| AliasRewrite { alias, family });
@@ -1188,6 +1372,8 @@ impl Core {
         bytes_out: u64,
         usage: Option<TokenUsage>,
     ) {
+        let duration_ms = meta.started.elapsed().as_millis() as u64;
+        record_throughput(&self.metrics, meta, outcome, duration_ms, usage);
         self.events.emit(CoreEvent::Completion(CompletionEvent {
             request_id: meta.request_id.clone(),
             at: meta.at,
@@ -1196,7 +1382,7 @@ impl Core {
             model: meta.model.clone(),
             provider_id: meta.provider_id.clone(),
             outcome,
-            duration_ms: meta.started.elapsed().as_millis() as u64,
+            duration_ms,
             bytes_out,
             usage,
             generation: meta.generation,
@@ -1244,7 +1430,7 @@ impl Core {
                 pending: Vec::new(),
                 decoder: (!content_encoding.is_identity())
                     .then(|| BodyDecoder::new(content_encoding)),
-                reporter: StreamReporter::new(self.events.clone(), meta),
+                reporter: StreamReporter::new(self.events.clone(), self.metrics.clone(), meta),
             })
         } else if is_event_stream {
             let base: Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>> = Box::pin(
@@ -1253,7 +1439,7 @@ impl Core {
             );
             Body::from_stream(ObservedJsonStream {
                 inner: base,
-                reporter: StreamReporter::new(self.events.clone(), meta),
+                reporter: StreamReporter::new(self.events.clone(), self.metrics.clone(), meta),
             })
         } else {
             let result = read_response_body_limited(
@@ -1769,8 +1955,40 @@ struct CompletionMeta {
     model: String,
     provider_id: String,
     started: Instant,
+    /// 首字节到达时刻（自 `started` 起的毫秒数），用于吞吐采样。
+    ttfb_ms: u64,
     /// 是否生成端点；非生成端点不计 token、也不计「用量缺失」。
     generation: bool,
+}
+
+/// 吞吐采样：`output_tokens / (duration_ms − ttfb_ms)`。
+///
+/// 采样条件（全部满足才记）：生成端点、正常完成、`output_tokens > 0`、
+/// `duration_ms > ttfb_ms`。非流式请求的尾段往往接近 0ms，此处直接不采样 ——
+/// 宁可用兜底值，也不要把噪声写进 EWMA。
+fn record_throughput(
+    metrics: &Metrics,
+    meta: &CompletionMeta,
+    outcome: CompletionOutcome,
+    duration_ms: u64,
+    usage: Option<TokenUsage>,
+) {
+    if outcome != CompletionOutcome::Completed || !meta.generation {
+        return;
+    }
+    let Some(output_tokens) = usage.map(|usage| usage.output_tokens).filter(|n| *n > 0) else {
+        return;
+    };
+    if duration_ms <= meta.ttfb_ms {
+        return;
+    }
+    let generation_ms = (duration_ms - meta.ttfb_ms) as f64;
+    let tokens_per_sec = output_tokens as f64 / (generation_ms / 1000.0);
+    metrics.record_throughput(
+        &meta.provider_id,
+        tokens_per_sec,
+        epoch_secs(SystemTime::now()),
+    );
 }
 
 /// 响应中的模型名回写：别名 + 家族决定回写位置。
@@ -1781,6 +1999,7 @@ struct AliasRewrite {
 
 struct StreamReporter {
     events: EventBus,
+    metrics: Arc<Metrics>,
     meta: CompletionMeta,
     usage: Option<TokenUsage>,
     bytes_out: u64,
@@ -1788,9 +2007,10 @@ struct StreamReporter {
 }
 
 impl StreamReporter {
-    fn new(events: EventBus, meta: CompletionMeta) -> Self {
+    fn new(events: EventBus, metrics: Arc<Metrics>, meta: CompletionMeta) -> Self {
         Self {
             events,
+            metrics,
             meta,
             usage: None,
             bytes_out: 0,
@@ -1827,6 +2047,8 @@ impl StreamReporter {
             return;
         }
         self.done = true;
+        let duration_ms = self.meta.started.elapsed().as_millis() as u64;
+        record_throughput(&self.metrics, &self.meta, outcome, duration_ms, self.usage);
         self.events.emit(CoreEvent::Completion(CompletionEvent {
             request_id: self.meta.request_id.clone(),
             at: self.meta.at,
@@ -1835,7 +2057,7 @@ impl StreamReporter {
             model: self.meta.model.clone(),
             provider_id: self.meta.provider_id.clone(),
             outcome,
-            duration_ms: self.meta.started.elapsed().as_millis() as u64,
+            duration_ms,
             bytes_out: self.bytes_out,
             usage: self.usage,
             generation: self.meta.generation,
@@ -1958,7 +2180,7 @@ fn ensure_stream_usage(raw: &Bytes) -> Bytes {
 }
 
 /// 在顶层对象的收尾 `}` 前插入一个成员（`{}` 时不加逗号）。
-fn insert_top_level_member(raw: &[u8], member: &str) -> Option<Vec<u8>> {
+pub(crate) fn insert_top_level_member(raw: &[u8], member: &str) -> Option<Vec<u8>> {
     let end = raw.iter().rposition(|byte| *byte == b'}')?;
     let mut before = end;
     while before > 0 && raw[before - 1].is_ascii_whitespace() {
@@ -2040,7 +2262,7 @@ fn top_level_string_span(raw: &[u8], key: &str) -> Option<(usize, usize)> {
 }
 
 /// 定位顶层 `key` 的完整值区间；字符串返回内容区间（不含引号）。
-fn top_level_value_span(raw: &[u8], key: &str) -> Option<(usize, usize)> {
+pub(crate) fn top_level_value_span(raw: &[u8], key: &str) -> Option<(usize, usize)> {
     let mut index = 0;
     let mut depth = 0usize;
     let mut expecting_key = false;
@@ -2162,7 +2384,7 @@ fn rewrite_response_model(raw: &[u8], alias: &str) -> Vec<u8> {
     }
 }
 
-fn find_string_end(raw: &[u8], quote: usize) -> Option<usize> {
+pub(crate) fn find_string_end(raw: &[u8], quote: usize) -> Option<usize> {
     let mut index = quote + 1;
     while index < raw.len() {
         match raw[index] {
@@ -2174,7 +2396,7 @@ fn find_string_end(raw: &[u8], quote: usize) -> Option<usize> {
     None
 }
 
-fn skip_ws(raw: &[u8], mut index: usize) -> usize {
+pub(crate) fn skip_ws(raw: &[u8], mut index: usize) -> usize {
     while index < raw.len() && raw[index].is_ascii_whitespace() {
         index += 1;
     }
@@ -2505,6 +2727,7 @@ mod tests {
             credential_kind: "google_service_account".to_string(),
             auth_scheme: "google_service_account".to_string(),
             options: Some(options.take()),
+            compat: Profile::NATIVE,
             api_formats: vec![ApiFormat::AnthropicMessages],
             models: Vec::new(),
             enabled: true,

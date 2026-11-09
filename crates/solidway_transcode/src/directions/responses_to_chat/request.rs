@@ -48,6 +48,7 @@ pub(super) fn convert(req: ResponsesRequest, plan: &Plan) -> Result<(ChatRequest
             "Responses request has no convertible input".to_string(),
         ));
     }
+    emulate_instruction_roles(&mut messages, &mut report);
     let messages = merge_assistant_messages(messages);
 
     let mut tool_inputs = req.tools.clone();
@@ -196,6 +197,38 @@ pub(super) fn convert(req: ResponsesRequest, plan: &Plan) -> Result<(ChatRequest
     };
 
     Ok((out, report))
+}
+
+/// 把 Responses 的 `developer` 角色（以及会话中段的 system）降级成 Chat 上游能接受的形状。
+///
+/// OpenAI 的 Responses API 用 `developer` 表达系统提示；Chat 上游只保证
+/// `system / user / assistant / tool`，严格实现（如 DashScope）会直接 400。
+/// 开头连续的系统消息改写为 `system`，之后出现的降级为 `user`（语义损失最小，
+/// 且不会触发「system 必须在开头」类错误）。
+fn emulate_instruction_roles(messages: &mut [ChatMessage], report: &mut Report) {
+    let mut conversational = false;
+    for (index, message) in messages.iter_mut().enumerate() {
+        match message.role.as_str() {
+            "developer" => {
+                message.role = if conversational { "user" } else { "system" }.to_string();
+                report.degraded(
+                    Side::Target,
+                    format!("/messages/{index}/role"),
+                    "Chat 上游不接受 developer 角色，已降级",
+                );
+            }
+            "system" if conversational => {
+                message.role = "user".to_string();
+                report.degraded(
+                    Side::Target,
+                    format!("/messages/{index}/role"),
+                    "Chat 上游要求 system 位于开头，已降级为 user",
+                );
+            }
+            "system" => {}
+            _ => conversational = true,
+        }
+    }
 }
 
 fn merge_assistant_messages(messages: Vec<ChatMessage>) -> Vec<ChatMessage> {

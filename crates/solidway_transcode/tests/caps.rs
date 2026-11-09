@@ -21,10 +21,11 @@ fn assert_reason(name: &str, support: Support) {
     }
 }
 
-fn request_fields(caps: &DirectionCaps) -> [(&'static str, Support); 19] {
+fn request_fields(caps: &DirectionCaps) -> [(&'static str, Support); 20] {
     [
         ("system_prompt", caps.request.system_prompt),
         ("developer_role", caps.request.developer_role),
+        ("system_messages", caps.request.system_messages),
         ("images", caps.request.images),
         ("documents", caps.request.documents),
         ("audio_input", caps.request.audio_input),
@@ -82,8 +83,8 @@ fn base_protocol(protocol: ProtocolId) -> ProtocolId {
 
 fn assert_not_wider(
     label: &str,
-    ours: [(&'static str, Support); 19],
-    base: [(&'static str, Support); 19],
+    ours: [(&'static str, Support); 20],
+    base: [(&'static str, Support); 20],
 ) {
     for ((name, ours), (_, base)) in ours.into_iter().zip(base) {
         assert!(

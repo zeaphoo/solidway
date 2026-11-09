@@ -37,9 +37,11 @@
 | 私有路由（private route） | 仅 owner 可见的路由；admin 也不能通过路由管理面访问其他用户的路由 | 全局路由、公共路由 |
 | 承接 Provider（serving provider） | 最终成功承接某个逻辑请求的 Provider；token 用量归属于它 | 成功账号、实际渠道 |
 | 用量缺失（usage missing） | 请求正常完成、但上游响应中没有可解析的 token usage；统计上单独计数，不做估算 | 未知 token、0 token |
-| 选号策略（selection strategy） | 路由级配置：决定同一条路由内多个 Provider 的尝试顺序（`round_robin` / `uptime` / `latency` / `auto`）；只影响选号，不影响转发字节 | 路由策略、负载均衡策略、routing |
+| 选号策略（selection strategy） | 路由级配置：决定**同一优先级档位内**多个 Provider 的尝试顺序（`round_robin` / `last_used` / `latency` / `throughput` / `auto`）；档位始终是硬约束，策略不越档；只影响选号，不影响转发字节 | 路由策略、负载均衡策略、routing、uptime 策略 |
 | Provider 优先级（provider priority） | Provider 凭据上的整数**档位**（`1..=1000`，默认 1）：数字越大越优先，按降序分档，档内再按选号策略排序；不进分数。「暂时不参与选号」用停用表达，不用档位 | 权重、weight、0 档 |
-| 选号指标（live metrics） | 数据面内存中每个 Provider 的首字节时延与失败率 EWMA（30 分钟陈旧判定），不落库 | 健康度、成功率统计 |
+| 最后使用优先（last used） | 选号策略之一：同一 (路由, 模型, 会话标识) 复用上次成功承载的 Provider（仅同档位内生效），无会话标识或无记录时回退轮询。会话记录在**所有**策略下都会写入，但只有本策略读取 | 粘性策略、session affinity |
+| 输出 token 速度（throughput） | 上游生成阶段的产出速率 `output_tokens ÷ (总耗时 − 首字节耗时)`，单位 token/s；仅在生成端点、`output_tokens > 0` 且总耗时大于首字节耗时（满足条件）时采样。跨厂商口径不可比，只作相对参考 | TPS、tokens/s 性能、QPS |
+| 选号指标（live metrics） | 数据面内存中每个 Provider 的首字节时延、失败率与输出 token 速度 EWMA（30 分钟陈旧判定），不落库 | 健康度、成功率统计、速度 |
 | 故障记录（incident） | Provider 一次故障的生命周期：原因码、严重级别、开始 / 最近 / 结束时间、次数；与「当前状态」互补，回池不删除 | 故障日志、告警历史 |
 | 故障严重级别（incident severity） | `transient`（限流 / 5xx 抖动，只记录）/ `degraded`（需关注：配额耗尽、403）/ `manual_action`（需人工：401） | 告警等级、优先级 |
 | 全局统计（global usage） | 仅 admin 可见的全站只读用量聚合，不提供路由配置访问 | 全站统计、超管统计 |
@@ -55,6 +57,7 @@
 
 ## 已弃用 / 已删除术语
 
+- `uptime` 选号策略（可用性优先）：**已删除**，语义并入 `auto`（`w_uptime` 默认 0.5）。存量数据由迁移改写为 `auto`，读取侧宽松解析旧值以防回滚。
 - `provider_keys.weight`（权重）：**schema 中已不存在**。它从未被数据面读取；语义由「Provider 优先级（provider priority）」取代。
 - `provider_keys.sort_order`（排序）：**schema 中已不存在**。它只影响管理面列表顺序，与选号无关；顺序统一由 `priority` 表达。
 - `provider_keys.protocol`（协议列）：**schema 中已不存在**。协议族与端点形态分别由 `api_formats` 与 `path_template` 表达（ADR 0011）；旧值域把两者混在一起，无法自解释。

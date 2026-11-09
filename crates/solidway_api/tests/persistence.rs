@@ -188,6 +188,8 @@ async fn e2e_scenario_failover_is_transparent() {
 #[tokio::test]
 async fn e2e_scenario_same_session_reuses_provider() {
     let harness = Harness::two_providers("e2e-affinity", "").await;
+    // 会话记录只在 `last_used` 策略下读取（轮询不再粘性）。
+    harness.set_strategy("r-main", "last_used").await;
     harness.mocks.a.set_fallback(MockResponse::ok("gpt-5"));
     harness.mocks.b.set_fallback(MockResponse::ok("gpt-5"));
 

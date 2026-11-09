@@ -211,13 +211,16 @@ async fn probe_body_timeout_does_not_recover_provider() {
 async fn affinity_reuses_same_provider_for_session() {
     let a = spawn_mock(Behavior::Ok).await;
     let b = spawn_mock(Behavior::Ok).await;
-    let cfg = base_config(
+    let mut cfg = base_config(
         vec![
             provider("a", a.base_url(), &["gpt-5"]),
             provider("b", b.base_url(), &["gpt-5"]),
         ],
         options(Duration::from_secs(1800)),
     );
+    // 会话记录只由 `last_used` 策略读取（轮询不再粘性）。
+    cfg.routes[0].selection =
+        solidway_core::RouteSelection::for_strategy(solidway_core::SelectionStrategy::LastUsed);
     let (base, _core) = spawn_core(cfg).await;
 
     let body = serde_json::json!({"model": "gpt-5", "prompt_cache_key": "sess-1"});

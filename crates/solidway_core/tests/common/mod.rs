@@ -29,6 +29,12 @@ pub enum Behavior {
     Ok,
     /// 指定状态码 + 文本体。
     Status(u16, String),
+    /// 前 `times` 次返回指定状态码 + 文本体，之后 200（用于兼容自愈重试）。
+    FailTimes {
+        status: u16,
+        body: String,
+        times: usize,
+    },
     /// SSE 流。
     Sse,
     /// 回显请求体里的 `model`（测试别名回写）。
@@ -124,6 +130,23 @@ async fn mock_handler(
     match behavior.lock().unwrap().clone() {
         Behavior::Ok => axum::Json(serde_json::json!({"ok": true})).into_response(),
         Behavior::Status(code, body) => (StatusCode::from_u16(code).unwrap(), body).into_response(),
+        Behavior::FailTimes {
+            status,
+            body,
+            times,
+        } => {
+            let hits = requests.lock().unwrap().len();
+            if hits <= times {
+                (
+                    StatusCode::from_u16(status).unwrap(),
+                    [(axum::http::header::CONTENT_TYPE, "application/json")],
+                    body,
+                )
+                    .into_response()
+            } else {
+                axum::Json(serde_json::json!({"ok": true})).into_response()
+            }
+        }
         Behavior::SlowBody {
             status,
             body,
@@ -260,6 +283,10 @@ pub struct ProviderSpec {
     pub api_formats: Vec<ApiFormat>,
     pub auth_scheme: String,
     pub priority: i64,
+    /// Provider 级选项（如 `compat` 适配档）。
+    pub options: Option<serde_json::Value>,
+    /// 完整模型映射（含元数据）；为空时按 `models` 逐项生成。
+    pub models_meta: Option<Vec<ModelMapping>>,
 }
 
 pub fn provider(id: &str, base_url: String, models: &[&str]) -> ProviderSpec {
@@ -271,6 +298,8 @@ pub fn provider(id: &str, base_url: String, models: &[&str]) -> ProviderSpec {
         api_formats: vec![ApiFormat::ChatCompletions, ApiFormat::Responses],
         auth_scheme: "bearer".to_string(),
         priority: 1,
+        options: None,
+        models_meta: None,
     }
 }
 
@@ -294,6 +323,7 @@ pub fn alias(name: &str, upstream: &str) -> ModelMapping {
     ModelMapping {
         name: name.to_string(),
         upstream: upstream.to_string(),
+        ..ModelMapping::default()
     }
 }
 
@@ -360,16 +390,17 @@ pub fn base_config(providers: Vec<ProviderSpec>, options: CoreOptions) -> CoreCo
                 api_key: format!("sk-{}", spec.id),
                 credential_kind: "api_key".to_string(),
                 auth_scheme: spec.auth_scheme,
-                options: None,
+                options: spec.options.clone(),
                 api_formats: spec.api_formats,
-                models: spec
-                    .models
-                    .into_iter()
-                    .map(|name| ModelMapping {
-                        name,
-                        upstream: String::new(),
-                    })
-                    .collect(),
+                models: spec.models_meta.unwrap_or_else(|| {
+                    spec.models
+                        .into_iter()
+                        .map(|name| ModelMapping {
+                            name,
+                            ..ModelMapping::default()
+                        })
+                        .collect()
+                }),
                 enabled: spec.enabled,
                 priority: spec.priority,
             })

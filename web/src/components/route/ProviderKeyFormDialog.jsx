@@ -50,11 +50,35 @@ const schema = z.object({
   auth_scheme: z.string().min(1),
   credential: z.string().optional(),
   models: z.array(
-    z.object({ name: z.string(), upstream: z.string(), renamed: z.boolean().optional() }),
+    z.object({
+      name: z.string(),
+      upstream: z.string(),
+      renamed: z.boolean().optional(),
+      // 模型元数据（对外声明用）：空字符串 / 空数组表示未声明。
+      context_window: z.union([z.string(), z.number()]).optional(),
+      max_output_tokens: z.union([z.string(), z.number()]).optional(),
+      input: z.union([z.string(), z.array(z.string())]).optional(),
+    }),
   ),
   priority: z.coerce.number().int().min(1).max(1000),
   status: z.enum(['active', 'inactive']),
 })
+
+// 元数据留空即「未声明」：字段会被省略，客户端回落到自己的默认值。
+const parsePositiveInt = (value) => {
+  const text = String(value ?? '').trim()
+  if (!text) return undefined
+  const parsed = Number(text)
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined
+}
+
+const parseModalities = (value) => {
+  const list = (Array.isArray(value) ? value : String(value ?? '').split(','))
+    .map((item) => String(item).trim().toLowerCase())
+    .filter(Boolean)
+  const unique = [...new Set(list)]
+  return unique.length ? unique : undefined
+}
 
 const EMPTY = {
   provider: '',
@@ -152,6 +176,9 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
       models: (providerKey?.models ?? []).map((mapping) => ({
         ...mapping,
         renamed: (mapping.upstream ?? '').trim() !== (mapping.name ?? '').trim(),
+        context_window: mapping.context_window ?? '',
+        max_output_tokens: mapping.max_output_tokens ?? '',
+        input: (mapping.input ?? []).join(', '),
       })),
       priority: providerKey?.priority ?? 1,
       status: providerKey?.status ?? 'active',
@@ -337,6 +364,9 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
         .map((mapping) => ({
           name: mapping.name.trim(),
           upstream: (mapping.upstream ?? '').trim(),
+          context_window: parsePositiveInt(mapping.context_window),
+          max_output_tokens: parsePositiveInt(mapping.max_output_tokens),
+          input: parseModalities(mapping.input),
         }))
         .filter((mapping) => mapping.name.length > 0),
       priority: values.priority,
@@ -651,7 +681,16 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => appendModel({ name: '', upstream: '', renamed: false })}
+                      onClick={() =>
+                        appendModel({
+                          name: '',
+                          upstream: '',
+                          renamed: false,
+                          context_window: '',
+                          max_output_tokens: '',
+                          input: '',
+                        })
+                      }
                     >
                       <PlusIcon className="size-4" />
                       {t('providers.addModel')}
@@ -676,8 +715,9 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
                         const renamed = modelsValue?.[index]?.renamed ?? false
                         return (
                           <div key={field.id} className="flex items-start gap-2">
+                            <div className="min-w-0 flex-1 space-y-2">
                             {/* 始终占两等分：单列时输入框只占左半格，与展开后单列宽度一致。 */}
-                            <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+                            <div className="grid min-w-0 grid-cols-2 gap-2">
                               {renamed ? (
                                 <>
                                   <div className="min-w-0 space-y-1 rounded-lg border border-dashed p-2">
@@ -705,6 +745,24 @@ export default function ProviderKeyFormDialog({ open, onOpenChange, routeId, pro
                                   {...register(`models.${index}.name`)}
                                 />
                               )}
+                            </div>
+                            {/* 模型元数据：留空即未声明（客户端回落到自己的默认值）。 */}
+                            <div className="grid grid-cols-3 gap-2">
+                              <Input
+                                inputMode="numeric"
+                                placeholder={t('providers.modelContextWindow')}
+                                {...register(`models.${index}.context_window`)}
+                              />
+                              <Input
+                                inputMode="numeric"
+                                placeholder={t('providers.modelMaxOutput')}
+                                {...register(`models.${index}.max_output_tokens`)}
+                              />
+                              <Input
+                                placeholder={t('providers.modelInput')}
+                                {...register(`models.${index}.input`)}
+                              />
+                            </div>
                             </div>
                             <div
                               className={`flex shrink-0 items-center gap-1 ${renamed ? 'mt-7' : ''}`}

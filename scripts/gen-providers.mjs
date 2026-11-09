@@ -244,6 +244,22 @@ const BASE_URL_VARIABLES = {
   ],
 }
 
+/**
+ * 上游兼容适配档：由控制面冻结进 provider 选项，数据面据此改写表示层。
+ * 只声明**实测过**的差异；缺省即 native（逐字节透传）。
+ * DashScope 兼容族（含 Token / Coding Plan）只认 system/assistant/user/tool/function，
+ * thinking 走顶层 enable_thinking。
+ */
+const QWEN_CHAT_COMPAT = { developer_role: 'emulated', thinking: 'qwen' }
+const CHAT_COMPAT = {
+  alibaba: QWEN_CHAT_COMPAT,
+  'alibaba-cn': QWEN_CHAT_COMPAT,
+  'alibaba-coding-plan': QWEN_CHAT_COMPAT,
+  'alibaba-coding-plan-cn': QWEN_CHAT_COMPAT,
+  'alibaba-token-plan': QWEN_CHAT_COMPAT,
+  'alibaba-token-plan-cn': QWEN_CHAT_COMPAT,
+}
+
 const FEATURED = {
   openai: { base_url: 'https://api.openai.com/v1', auth_scheme: 'bearer', default_api_formats: ['chat_completions', 'responses'] },
   anthropic: { base_url: 'https://api.anthropic.com/v1', auth_scheme: 'x-api-key' },
@@ -457,6 +473,7 @@ function normalize(key, raw, extra = {}, featured = false) {
   if (override.path_actions) item.path_actions = override.path_actions
   if (override.aws_service) item.aws_service = override.aws_service
   if (override.anthropic_version) item.anthropic_version = override.anthropic_version
+  if (CHAT_COMPAT[key]) item.chat_compat = CHAT_COMPAT[key]
   return item
 }
 
@@ -498,6 +515,7 @@ async function main() {
   }
 
   for (const entry of MANUAL) {
+    const manualCompat = entry.chat_compat ?? CHAT_COMPAT[entry.key]
     byKey.set(entry.key, {
       key: entry.key,
       name: entry.name,
@@ -511,6 +529,7 @@ async function main() {
       ...(entry.default_api_formats ? { default_api_formats: entry.default_api_formats } : {}),
       ...(entry.path_template ? { path_template: entry.path_template } : {}),
       ...(entry.path_variables ? { path_variables: entry.path_variables } : {}),
+      ...(manualCompat ? { chat_compat: manualCompat } : {}),
     })
   }
 
