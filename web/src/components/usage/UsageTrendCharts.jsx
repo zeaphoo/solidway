@@ -22,6 +22,18 @@ function chartStyle() {
   }
 }
 
+/**
+ * 图表留白：MUST NOT 用负的 left 抵消，否则 Y 轴刻度会被容器裁掉
+ * （刻度文字右对齐到轴线，负留白会把它推到画布外）。
+ */
+const CHART_MARGIN = { top: 4, right: 8, bottom: 0, left: 0 }
+
+/** 刻度文字：11px（继承 12px 的正文大小在这些小图里偏大、更易被裁切）。 */
+const AXIS_TICK = { fontSize: 11 }
+
+/** 刻度与轴线的间距（给文字留出呼吸位）。 */
+const TICK_MARGIN = 4
+
 export default function UsageTrendCharts({ series, isPending, compact = false, bare = false }) {
   const { t } = useTranslation()
   const data = (series ?? []).map((point) => ({
@@ -53,10 +65,15 @@ export default function UsageTrendCharts({ series, isPending, compact = false, b
         <PanelBody>
           <div className={compact ? 'h-40 w-full' : 'h-56 w-full'}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+              <AreaChart data={data} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="label" hide />
-                <YAxis allowDecimals={false} width={40} className="text-xs" />
+                <YAxis
+                  allowDecimals={false}
+                  width="auto"
+                  tickMargin={TICK_MARGIN}
+                  tick={AXIS_TICK}
+                />
                 <Tooltip contentStyle={chartStyle()} />
                 <Area
                   type="monotone"
@@ -87,10 +104,15 @@ export default function UsageTrendCharts({ series, isPending, compact = false, b
         <PanelBody>
           <div className={compact ? 'h-40 w-full' : 'h-56 w-full'}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+              <AreaChart data={data} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="label" hide />
-                <YAxis width={48} tickFormatter={formatTokens} className="text-xs" />
+                <YAxis
+                  width="auto"
+                  tickMargin={TICK_MARGIN}
+                  tick={AXIS_TICK}
+                  tickFormatter={formatTokens}
+                />
                 <Tooltip contentStyle={chartStyle()} formatter={(value) => formatTokens(value)} />
                 <Area
                   type="monotone"
