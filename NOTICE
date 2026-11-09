@@ -1,0 +1,10 @@
+Solidway
+Copyright 2026 Solidway contributors
+
+This product includes software developed as part of the Solidway project
+(https://github.com/zeaphoo/solidway).
+
+Third-party components distributed with this product retain their own
+copyright and license notices. Vendored Python libraries used by the
+packaging scripts are listed in scripts/python/VENDORED.md; Rust and
+JavaScript dependencies retain the licenses declared in their packages.

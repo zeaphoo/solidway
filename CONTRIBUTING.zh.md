@@ -59,6 +59,10 @@ openspec validate --all
 - 一个 PR 只做一件逻辑上的事；描述里写明你跑过的验证。
 - 若改动涉及规格中的行为，请附上对应的 OpenSpec change 目录。
 
+## 许可
+
+本项目使用 Apache-2.0 许可证（见 [`LICENSE`](LICENSE) 与 [`NOTICE`](NOTICE)）。提交贡献即表示你同意该贡献以相同条款授权，并且你有权授予该许可。
+
 ## 报障
 
 请提供：

@@ -31,18 +31,20 @@ This package installs the standalone service and a systemd unit."""
 assets = [
     ["target/release/solidway", "usr/bin/", "755"],
     ["../../packaging/deb/copyright", "usr/share/doc/solidway/copyright", "644"],
+    ["../../NOTICE", "usr/share/doc/solidway/NOTICE", "644"],
 ]
 maintainer-scripts = "../../packaging/deb"
 systemd-units = { unit-scripts = "../../packaging/systemd", enable = true, start = true }
 
 [package.metadata.generate-rpm]
 summary = "Self-hosted LLM gateway with pooled provider credentials"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 url = "https://github.com/zeaphoo/solidway"
 assets = [
     { source = "target/release/solidway", dest = "/usr/bin/solidway", mode = "755" },
     { source = "../../packaging/systemd/solidway.service", dest = "/usr/lib/systemd/system/solidway.service", mode = "644" },
     { source = "../../LICENSE", dest = "/usr/share/licenses/solidway/LICENSE", mode = "644" },
+    { source = "../../NOTICE", dest = "/usr/share/licenses/solidway/NOTICE", mode = "644" },
 ]
 pre_install_script = "../../packaging/rpm/pre_install.sh"
 post_install_script = "../../packaging/rpm/post_install.sh"

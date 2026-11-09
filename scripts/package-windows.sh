@@ -118,6 +118,8 @@ mkdir -p "$DIST_DIR/portable"
 # 两个名字必须在**大小写不敏感**的文件系统上也不同，否则便携包会少一个 exe。
 cp -f "$APP_EXE" "$DIST_DIR/portable/SolidwayApp.exe"
 cp -f "$SOLIDWAY_EXE" "$DIST_DIR/portable/solidway.exe"
+cp -f "$ROOT/LICENSE" "$DIST_DIR/portable/LICENSE"
+cp -f "$ROOT/NOTICE" "$DIST_DIR/portable/NOTICE"
 cat > "$DIST_DIR/portable/README.txt" <<TXT
 Solidway 便携版 ${version} (x64)          Solidway portable ${version} (x64)
 ================================================================================
@@ -131,6 +133,8 @@ Solidway 便携版 ${version} (x64)          Solidway portable ${version} (x64)
 目录结构 / Layout
   SolidwayApp.exe   桌面应用 / desktop app
   solidway.exe      网关 / gateway —— 必须与 SolidwayApp.exe 同目录
+  LICENSE           Apache-2.0 许可证全文 / full license text
+  NOTICE            版权与第三方声明 / copyright and third-party notices
   README.txt        本说明 / this file
 
 首次启动 / First run
@@ -175,7 +179,7 @@ WebView2
   Delete this folder. To remove data as well, delete %APPDATA%\xyz.solidway.desktop.
 
 许可证 / License
-  AGPL-3.0-only — https://github.com/zeaphoo/solidway/blob/main/LICENSE
+  Apache-2.0 — https://github.com/zeaphoo/solidway/blob/main/LICENSE
 TXT
 
 ZIP="$DIST_DIR/solidway-app_${version}_windows_x64_portable.zip"

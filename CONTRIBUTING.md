@@ -59,6 +59,10 @@ Front-end code is linted with `pnpm --dir web lint`.
 - One logical change per pull request. Include the verification you ran in the description.
 - If a change touches specified behaviour, link the OpenSpec change directory.
 
+## Licensing
+
+Solidway is licensed under Apache-2.0 (see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE)). By submitting a contribution you agree that it is licensed under the same terms and that you have the right to grant that license.
+
 ## Reporting bugs
 
 Include:

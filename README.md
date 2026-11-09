@@ -100,14 +100,14 @@ Sources: Bifrost and LiteLLM project documentation, reviewed October 2026. Produ
 | Version | `0.5.0-rc.2`, pre-1.0 — interfaces may change between minor releases |
 | Source | Complete implementation in this repository |
 | Platforms | Linux (server + desktop), macOS (desktop), Windows (desktop) |
-| License | AGPL-3.0-only |
+| License | Apache-2.0 |
 | Not yet available | Container images, Prometheus/OTLP, email/Slack alerting, cross-protocol transcode wiring, code signing/notarization |
 
 ## License
 
-AGPL-3.0-only. You can run, modify and self-host it freely. If you offer a modified version to others **as a network service**, the AGPL requires you to give those users access to the corresponding source.
+Apache-2.0. You can run, modify, self-host and redistribute it, including as part of a closed-source product, provided you keep the copyright and license notices and comply with the patent and attribution terms. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
 
-Running Solidway internally, or as a service to your own employees, carries no such obligation. Commercial support and licensing for cases the AGPL does not fit are available — open an issue or contact the maintainer.
+The license does not grant trademark rights; the Solidway name and logo remain with their respective owners.
 
 ## Further reading
 

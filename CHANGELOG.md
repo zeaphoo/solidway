@@ -8,6 +8,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **许可证改为 Apache-2.0**：由 AGPL-3.0-only 改为 Apache-2.0（宽松许可、含明确专利授权；不再有「把修改版作为网络服务提供须开源」的义务）。新增仓库根 `NOTICE`，deb / rpm 包与 Windows 便携版说明同步更新；`Cargo.toml` 的 `license` 字段改为 `Apache-2.0`。
+
 ## [0.5.0-rc.2] - 2026-10-30
 
 ### Changed
