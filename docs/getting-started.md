@@ -89,13 +89,13 @@ Each package ships the gateway binary next to the application executable, so a s
 
 ## Data directory
 
-`<data_root>` is the only stateful location:
+`<data_root>` is the only stateful location — both the desktop shell and the gateway subprocess it launches write here:
 
 | Platform | Path |
 |---|---|
-| Linux | `~/.local/share/xyz.solidway.desktop` |
-| macOS | `~/Library/Application Support/xyz.solidway.desktop` |
-| Windows | `%APPDATA%\xyz.solidway.desktop` |
+| Linux | `~/.local/share/net.quadhub.solidway` |
+| macOS | `~/Library/Application Support/net.quadhub.solidway` |
+| Windows | `%APPDATA%\net.quadhub.solidway` |
 | Linux package | `/var/lib/solidway` |
 
 | File | Contents |
@@ -104,6 +104,8 @@ Each package ships the gateway binary next to the application executable, so a s
 | `usage_detail.db` | per-request usage detail (retention configurable) |
 | `master.key` | encryption key for provider credentials — **back up separately** |
 | `solidway.log` | gateway stdout/stderr (desktop app only) |
+| `desktop.log`, `desktop.toml`, `desktop.status.json` | desktop shell log, preferences and apply receipt |
+| `tls/` | built-in ACME account and certificate cache |
 
 Without `master.key`, provider credentials in `solidway.db` cannot be decrypted. Back up the pair together, and never commit either.
 

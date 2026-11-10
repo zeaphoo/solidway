@@ -232,6 +232,19 @@ fn classify_bind(kind: &str) -> FailureKind {
     }
 }
 
+/// 子进程参数：**唯一**位置参数是桌面壳的 `data_root`。
+///
+/// 不变量：壳与其拉起的网关必须共用同一份 `data_root`——网关的
+/// `solidway.db` / `usage_detail.db` / `master.key` / `tls/` / 日志全部
+/// 由这一个参数决定，壳 MUST NOT 为它另指数据目录，也不额外传环境变量。
+fn child_args(data_root: &Path) -> Vec<std::ffi::OsString> {
+    vec![
+        data_root.as_os_str().to_os_string(),
+        "--mode".into(),
+        "desktop".into(),
+    ]
+}
+
 /// 日志末尾若干行（去 ANSI、按字符截断），用于错误页内嵌。
 fn log_tail(data_root: &std::path::Path, lines: usize) -> String {
     let Ok(text) = std::fs::read_to_string(data_root.join("solidway.log")) else {
@@ -967,9 +980,7 @@ impl Supervisor {
 
         let mut command = Command::new(bin);
         command
-            .arg(&self.config.data_root)
-            .arg("--mode")
-            .arg("desktop")
+            .args(child_args(&self.config.data_root))
             // stdin 是存活信号：壳死亡时管道关闭，子进程读到 EOF 即退出。
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -1015,7 +1026,10 @@ impl Supervisor {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_bind, classify_spawn_error, flag, open_action, strip_ansi, FailureKind, OpenAction, State};
+    use super::{
+        child_args, classify_bind, classify_spawn_error, flag, open_action, strip_ansi, FailureKind,
+        OpenAction, State,
+    };
 
     #[test]
     fn secret_events_are_filtered_from_log() {
@@ -1036,6 +1050,23 @@ mod tests {
         assert_eq!(classify_bind("permission-denied"), FailureKind::PortForbidden);
         assert_eq!(classify_bind("address-in-use"), FailureKind::PortConflict);
         assert_eq!(classify_bind(""), FailureKind::PortConflict);
+    }
+
+    /// 网关的数据目录只能由位置参数 `data_root` 决定（壳与子进程共用一份）。
+    #[test]
+    fn child_receives_data_root_as_sole_positional_arg() {
+        let root = std::path::Path::new("/tmp/solidway-data-root");
+        let args = child_args(root);
+        assert_eq!(args[0], root.as_os_str());
+        assert_eq!(
+            args.iter().filter(|arg| arg.as_os_str() == root.as_os_str()).count(),
+            1,
+            "data_root 不应重复：{args:?}"
+        );
+        assert_eq!(
+            args,
+            [root.as_os_str(), "--mode".as_ref(), "desktop".as_ref()]
+        );
     }
 
     #[test]

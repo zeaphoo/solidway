@@ -58,7 +58,7 @@ macOS 发布产物需要 **Developer ID 签名 + Apple 公证**，仓库 secrets
 只想演练而不发 Release：手动触发 `Release` 工作流，`publish=false`（可选 `with_mac=false`
 跳过 macOS，若尚未配置 secrets）。
 
-`app/tauri.conf.json` 的 `identifier` 为 `xyz.solidway.desktop`（域名 `solidway.xyz` 的反向 DNS，命名约定 `xyz.<项目>.<端>`）。发布前没有历史用户，因此**不做数据目录迁移**：老开发者本机由旧 identifier 派生的目录（如 `~/Library/Application Support/xyz.solidway`、`%APPDATA%\xyz.solidway`）需要手工改名或删除。
+`app/tauri.conf.json` 的 `identifier` 为 `net.quadhub.solidway`（域名 `quadhub.net` 的反向 DNS，命名约定 `<域名倒序>.<项目>`）。桌面壳 `data_root`、macOS Bundle ID 与三平台数据目录都由它派生；**不做数据目录迁移**：本机由旧 identifier（`xyz.solidway.desktop`）派生的目录（如 `~/Library/Application Support/xyz.solidway.desktop`、`%APPDATA%\xyz.solidway.desktop`）需要手工改名或删除。
 
 **Linux 客户端依赖服务包**：客户端不内嵌 `solidway`，按 PATH 使用 `deb`/`rpm` 安装的
 `/usr/bin/solidway`。因此安装顺序是「先服务包、后客户端」（见下文「与 Tauri 桌面应用的关系」）。
@@ -264,7 +264,7 @@ Windows 与 macOS 默认的文件系统**不区分大小写**：`Solidway.exe` �
   选择「更多信息 → 仍要运行」；企业环境可用 GPO/信任策略放行。
 - 需要 **WebView2 运行时**：Windows 10 1803+ 通常随 Edge 已安装；缺失时安装包会
   引导安装（Tauri 的 bootstrapper），便携版需用户自行安装。
-- 数据目录为 `%APPDATA%\xyz.solidway.desktop`；Windows 上该目录不得位于共享目录（主密钥依赖目录 ACL）。
+- 数据目录为 `%APPDATA%\net.quadhub.solidway`；Windows 上该目录不得位于共享目录（主密钥依赖目录 ACL）。
 
 ## macOS desktop app
 
@@ -352,11 +352,11 @@ Developer ID 签名包。若确需临时自签（仅本机冒烟/应急，**不�
 
 ### 冒烟与数据目录
 
-`data_root` 固定为 `~/Library/Application Support/xyz.solidway.desktop`（不读配置文件、
+`data_root` 固定为 `~/Library/Application Support/net.quadhub.solidway`（不读配置文件、
 不支持应用专属环境变量覆盖）。冒烟会写真实数据目录，按下面程序隔离：
 
 ```bash
-DATA="$HOME/Library/Application Support/xyz.solidway.desktop"
+DATA="$HOME/Library/Application Support/net.quadhub.solidway"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 [ -d "$DATA" ] && mv "$DATA" "$DATA.bak-$STAMP"   # 备份真实数据
 # 启动 app → 状态转「运行中」→ 控制台可达（端口以 solidway: listening addr= 为准，缺省 6565）
@@ -371,7 +371,7 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 - **备份堆积**：`bak-<时间戳>` 只保留**最近 2 份**，更早的在确认最新备份可恢复后手工删除：
 
 ```bash
-ls -dt "$HOME/Library/Application Support"/xyz.solidway.desktop.bak-* 2>/dev/null | tail -n +3
+ls -dt "$HOME/Library/Application Support"/net.quadhub.solidway.bak-* 2>/dev/null | tail -n +3
 # 确认上面列出的都是可删旧备份后：| xargs rm -rf
 ```
 

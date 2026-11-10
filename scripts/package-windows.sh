@@ -144,7 +144,7 @@ Solidway 便携版 ${version} (x64)          Solidway portable ${version} (x64)
   be set under Profile — it is only needed for browser or shared access.
 
 数据目录 / Data directory
-  %APPDATA%\xyz.solidway.desktop
+  %APPDATA%\net.quadhub.solidway
   solidway.db        用户、路由、Provider 凭据（加密）、设置
   usage_detail.db    逐条用量明细
   master.key         加密主密钥 —— 必须与 solidway.db 一起备份
@@ -175,8 +175,8 @@ WebView2
   "More info" → "Run anyway".
 
 卸载 / Uninstall
-  删除本目录即可；如需清除数据，再删除 %APPDATA%\xyz.solidway.desktop。
-  Delete this folder. To remove data as well, delete %APPDATA%\xyz.solidway.desktop.
+  删除本目录即可；如需清除数据，再删除 %APPDATA%\net.quadhub.solidway。
+  Delete this folder. To remove data as well, delete %APPDATA%\net.quadhub.solidway.
 
 许可证 / License
   Apache-2.0 — https://github.com/zeaphoo/solidway/blob/main/LICENSE

@@ -89,13 +89,13 @@ Tauri 外壳：在本机托管网关、用 webview 打开控制台，支持开�
 
 ## 数据目录
 
-`<data_root>` 是唯一的状态目录：
+`<data_root>` 是唯一的状态目录——桌面壳与它拉起的网关子进程都写在这里：
 
 | 平台 | 路径 |
 |---|---|
-| Linux | `~/.local/share/xyz.solidway.desktop` |
-| macOS | `~/Library/Application Support/xyz.solidway.desktop` |
-| Windows | `%APPDATA%\xyz.solidway.desktop` |
+| Linux | `~/.local/share/net.quadhub.solidway` |
+| macOS | `~/Library/Application Support/net.quadhub.solidway` |
+| Windows | `%APPDATA%\net.quadhub.solidway` |
 | Linux 安装包 | `/var/lib/solidway` |
 
 | 文件 | 内容 |
@@ -104,6 +104,8 @@ Tauri 外壳：在本机托管网关、用 webview 打开控制台，支持开�
 | `usage_detail.db` | 逐条用量明细（保留策略可配置） |
 | `master.key` | Provider 凭据的加密主密钥——**必须单独备份** |
 | `solidway.log` | 网关 stdout/stderr（仅桌面端） |
+| `desktop.log`、`desktop.toml`、`desktop.status.json` | 桌面壳日志、偏好与回执 |
+| `tls/` | 内置 ACME 账户与证书缓存 |
 
 没有 `master.key`，`solidway.db` 里的 Provider 凭据无法解密。两个文件要一起备份，且都不要进版本库。
 
