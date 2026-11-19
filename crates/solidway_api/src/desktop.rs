@@ -97,6 +97,27 @@ pub fn load_status(data_root: &Path) -> Option<Status> {
     serde_json::from_str(&text).ok()
 }
 
+/// 异步读偏好：请求路径不做同步磁盘 IO，交给 blocking pool。
+///
+/// 文件很小，读失败 / 任务失败都按「无法读取」处理（与同步版一致）。
+pub async fn load_prefs_async(data_root: PathBuf) -> (Prefs, PrefsSource) {
+    match tokio::task::spawn_blocking(move || load_prefs(&data_root)).await {
+        Ok(result) => result,
+        Err(error) => {
+            tracing::warn!(%error, "desktop prefs read task failed");
+            (Prefs::defaults(), PrefsSource::Unreadable)
+        }
+    }
+}
+
+/// 异步读回执；文件缺失 / 解析失败 / 任务失败均返回 `None`。
+pub async fn load_status_async(data_root: PathBuf) -> Option<Status> {
+    tokio::task::spawn_blocking(move || load_status(&data_root))
+        .await
+        .ok()
+        .flatten()
+}
+
 pub fn prefs_path(data_root: &Path) -> PathBuf {
     data_root.join(PREFS_FILE)
 }

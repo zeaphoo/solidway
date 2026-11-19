@@ -32,7 +32,10 @@
 ## 异步与阻塞边界
 
 - 服务进程运行在 Tokio runtime；CPU 密集型操作（Argon2 口令哈希/校验）通过 `spawn_blocking` 执行，并用信号量限制并发，不在 async handler 中直接计算。
-- 请求路径不做同步磁盘 I/O：静态资源磁盘模式使用 `tokio::fs::read`；TLS 证书/账户文件的读取与落盘（含 `fsync`）通过 `spawn_blocking` 执行。
+- 请求路径不做同步磁盘 I/O：静态资源磁盘模式使用 `tokio::fs::read`；TLS 证书/账户文件的读取与落盘（含 `fsync`）通过 `spawn_blocking` 执行；桌面偏好 / 回执的只读视图同样走 `spawn_blocking`。
+- 大响应体的旁路处理不占 async worker：非流式响应体的解压 / usage 解析 / 别名回写整体放进 `spawn_blocking`（转发字节仍是上游原始 `Bytes`，无需别名时零拷贝）；SSE 的行解析在 `poll_next` 内完成，按块扫描一次、行用切片观测。
+- stdout 事件（`solidway: …`）是同步写，handler 里发事件（重启 / 桌面偏好）经 `spawn_blocking` 执行，避免管道对端不读时占住 worker。
+- 会话粘性表按路由分片（每路由一把 `tokio::Mutex`），热路径只做 O(1) 插入 / 查找：过期清扫按分片惰性触发，另有 `Core::spawn_maintenance` 每 60 秒兜底；清理 MUST NOT 随条目总数出现在请求路径上。
 - 用量聚合落盘按批放入单个 SQLite 事务；过期聚合/明细清理按固定批次删除，避免一次 `DELETE` 长时间持有写锁。
 - `std::sync::RwLock` 只用于极短的内存快照/指标临界区，禁止跨 `.await` 持有；需要跨 await 的共享状态使用 `tokio::sync`。
 

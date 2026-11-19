@@ -2383,7 +2383,14 @@ pub async fn app_restart(
     if !state.mode.is_desktop() {
         return Err(ApiError::RestartUnsupported);
     }
-    crate::events::restart_requested("network-settings");
+    // stdout 事件是同步写：放到 blocking pool，避免管道对端不读时占住 async worker。
+    if let Err(error) = tokio::task::spawn_blocking(|| {
+        crate::events::restart_requested("network-settings");
+    })
+    .await
+    {
+        tracing::error!(%error, "failed to emit restart-requested event");
+    }
     // 与 SIGTERM / stdin EOF 共用统一关闭通道：由 main 停止接受新连接、
     // 等待在途请求并执行 flush + 快照，再统一退出。
     if !state.request_shutdown() {
@@ -2423,12 +2430,12 @@ pub async fn app_desktop_get(
             status: None,
         }));
     }
-    let (prefs, source) = desktop::load_prefs(&state.data_root);
+    let (prefs, source) = desktop::load_prefs_async(state.data_root.clone()).await;
     Ok(Json(DesktopView {
         available: true,
         prefs: Some(prefs),
         prefs_source: Some(source),
-        status: desktop::load_status(&state.data_root),
+        status: desktop::load_status_async(state.data_root.clone()).await,
     }))
 }
 
@@ -2451,7 +2458,16 @@ pub async fn app_desktop_put(
         return Err(ApiError::DesktopUnsupported);
     }
     let apply_id = format!("{:08x}", rand::random::<u32>());
-    crate::events::desktop_apply(&apply_id, req.autostart, req.close_window_to_tray);
+    // stdout 事件是同步写：放到 blocking pool，避免管道对端不读时占住 async worker。
+    let event_id = apply_id.clone();
+    let (autostart, close_to_tray) = (req.autostart, req.close_window_to_tray);
+    if let Err(error) = tokio::task::spawn_blocking(move || {
+        crate::events::desktop_apply(&event_id, autostart, close_to_tray);
+    })
+    .await
+    {
+        tracing::error!(%error, "failed to emit desktop-apply event");
+    }
     Ok((
         StatusCode::ACCEPTED,
         Json(serde_json::json!({ "apply_id": apply_id, "pending": true })),
@@ -3175,6 +3191,26 @@ impl DiscoverOutcome {
     }
 }
 
+/// 「手动获取模型 / 创建凭据时自动拉取」共用的 HTTP client。
+///
+/// 连接池与 TLS 配置只建一次：旧实现每次调用新建 client（含整套 TLS 栈）。
+/// 超时仍由调用方按请求设置（手动 15s / 自动拉取 5s）。
+static DISCOVER_CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+
+fn discover_client() -> std::result::Result<&'static reqwest::Client, String> {
+    if let Some(client) = DISCOVER_CLIENT.get() {
+        return Ok(client);
+    }
+    let client = reqwest::Client::builder()
+        .build()
+        .map_err(|error| format!("构建 HTTP client 失败: {error}"))?;
+    // 并发首建时可能有人先 set 成功；以已存在的实例为准。
+    let _ = DISCOVER_CLIENT.set(client);
+    DISCOVER_CLIENT
+        .get()
+        .ok_or_else(|| "构建 HTTP client 失败".to_string())
+}
+
 /// 手动「获取模型」与创建时自动拉取共用的上游调用（DRY）。
 ///
 /// 地址按家族归一化后取 `{base}/models`（OpenAI 不补版本段，Anthropic 补 `/v1`）；
@@ -3191,14 +3227,12 @@ async fn discover_models_with(
     if base.is_empty() {
         return DiscoverOutcome::failure("base_url 为空".to_string());
     }
-    let client = match reqwest::Client::builder().timeout(timeout).build() {
+    let client = match discover_client() {
         Ok(client) => client,
-        Err(error) => {
-            return DiscoverOutcome::failure(format!("构建 HTTP client 失败: {error}"));
-        }
+        Err(error) => return DiscoverOutcome::failure(error),
     };
     let url = format!("{base}/models");
-    let request = client.get(&url);
+    let request = client.get(&url).timeout(timeout);
     let request = match auth_scheme {
         "x-api-key" => request.header("x-api-key", api_key),
         _ => request.header(reqwest::header::AUTHORIZATION, format!("Bearer {api_key}")),

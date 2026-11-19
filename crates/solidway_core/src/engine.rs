@@ -472,6 +472,27 @@ impl Core {
         self.events.subscribe()
     }
 
+    /// 清理过期的会话粘性条目（各路由分片独立加锁，不影响转发）。
+    pub async fn prune_affinity(&self) {
+        self.affinity.prune().await;
+    }
+
+    /// 起后台维护任务：定期清理过期粘性条目，避免长时间无流量的路由把内存占住。
+    ///
+    /// 热路径（`remember` / `lookup`）只做 O(1) 操作，清理不落在请求上。
+    pub fn spawn_maintenance(self: &Arc<Self>) {
+        const INTERVAL: Duration = Duration::from_secs(60);
+        let core = Arc::clone(self);
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(INTERVAL);
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                ticker.tick().await;
+                core.prune_affinity().await;
+            }
+        });
+    }
+
     pub fn probe_count(&self) -> u64 {
         self.probe_count.load(Ordering::Relaxed)
     }
@@ -1450,20 +1471,27 @@ impl Core {
             .await;
             match result {
                 Ok(bytes) => {
-                    // usage 只在旁路解码后的明文上解析；发给客户端的仍是原始字节。
-                    let parsed = match content_encoding {
-                        ContentEncoding::Identity => serde_json::from_slice::<Value>(&bytes).ok(),
-                        kind => decode_bytes(kind, &bytes)
-                            .and_then(|raw| serde_json::from_slice::<Value>(&raw).ok()),
-                    };
-                    let usage = parsed.as_ref().and_then(extract_usage_from_json);
+                    // usage 解析 / 解压 / 别名回写都是 CPU 活：放到 blocking pool，
+                    // 避免大响应（上限 `response_body_limit`）把 async worker 占住，
+                    // 进而拖住同一 runtime 上的其它请求。
                     let bytes_out = bytes.len() as u64;
-                    let bytes = match &alias {
-                        Some(alias) => rewrite_alias_json(&bytes, alias),
-                        None => bytes.to_vec(),
+                    let payload = bytes.clone();
+                    let analyzed = tokio::task::spawn_blocking(move || {
+                        analyze_json_body(payload, content_encoding, alias)
+                    })
+                    .await;
+                    let (usage, output) = match analyzed {
+                        Ok(result) => result,
+                        Err(error) => {
+                            tracing::error!(
+                                %error,
+                                "response body analysis task failed; forwarding raw bytes"
+                            );
+                            (None, bytes)
+                        }
                     };
                     self.emit_completion(&meta, CompletionOutcome::Completed, bytes_out, usage);
-                    Body::from(bytes)
+                    Body::from(output)
                 }
                 Err(error) => {
                     let reason = match &error {
@@ -1483,6 +1511,29 @@ impl Core {
         copy_response_headers(response.headers_mut(), &headers);
         response
     }
+}
+
+/// 非流式响应体的旁路分析：解压 → 解析 usage → 按需回写模型别名。
+///
+/// 纯 CPU、无 IO，由调用方放到 blocking pool 执行。转发字节始终是上游原始字节；
+/// 不需要别名改写时直接复用入参 `Bytes`（零拷贝）。
+fn analyze_json_body(
+    bytes: Bytes,
+    content_encoding: ContentEncoding,
+    alias: Option<AliasRewrite>,
+) -> (Option<TokenUsage>, Bytes) {
+    let parsed = match content_encoding {
+        ContentEncoding::Identity => serde_json::from_slice::<Value>(&bytes).ok(),
+        kind => {
+            decode_bytes(kind, &bytes).and_then(|raw| serde_json::from_slice::<Value>(&raw).ok())
+        }
+    };
+    let usage = parsed.as_ref().and_then(extract_usage_from_json);
+    let output = match alias {
+        Some(alias) => Bytes::from(rewrite_alias_json(&bytes, &alias)),
+        None => bytes,
+    };
+    (usage, output)
 }
 
 /// 入站鉴权头的固定尝试顺序：OpenAI 家族 SDK、Anthropic SDK。
@@ -2073,6 +2124,48 @@ struct ObservedSseStream {
     reporter: StreamReporter,
 }
 
+impl ObservedSseStream {
+    /// 把新到的一块明文喂给行解析。
+    ///
+    /// 整块只扫一遍、行用切片直接观测，处理完前缀后只搬一次内存；
+    /// 旧实现逐行 `drain(..=pos)`，每行都要把剩余字节前移一遍。
+    fn observe(&mut self, decoded: &[u8]) {
+        if decoded.is_empty() {
+            return;
+        }
+        self.pending.extend_from_slice(decoded);
+        let Some(last_newline) = self.pending.iter().rposition(|byte| *byte == b'\n') else {
+            self.trim_pending();
+            return;
+        };
+        // 拆分字段借用：`pending` 只读、`reporter` 可变。
+        let (pending, reporter) = (&self.pending, &mut self.reporter);
+        let mut start = 0;
+        while start <= last_newline {
+            let Some(offset) = pending[start..=last_newline]
+                .iter()
+                .position(|byte| *byte == b'\n')
+            else {
+                break;
+            };
+            let end = start + offset + 1;
+            reporter.observe_line(&pending[start..end]);
+            start = end;
+        }
+        self.pending.drain(..start);
+        self.trim_pending();
+    }
+
+    /// 单行异常超长时保留尾部，避免无限增长。
+    fn trim_pending(&mut self) {
+        const CAP: usize = 1024 * 1024;
+        if self.pending.len() > CAP {
+            let drop = self.pending.len() - CAP;
+            self.pending.drain(..drop);
+        }
+    }
+}
+
 impl Stream for ObservedSseStream {
     type Item = Result<Bytes, std::io::Error>;
 
@@ -2080,20 +2173,11 @@ impl Stream for ObservedSseStream {
         match self.inner.as_mut().poll_next(cx) {
             Poll::Ready(Some(Ok(chunk))) => {
                 self.reporter.bytes_out += chunk.len() as u64;
-                let decoded = match self.decoder.as_mut() {
-                    Some(decoder) => decoder.push(&chunk),
-                    None => chunk.to_vec(),
-                };
-                self.pending.extend_from_slice(&decoded);
-                while let Some(position) = self.pending.iter().position(|byte| *byte == b'\n') {
-                    let line: Vec<u8> = self.pending.drain(..=position).collect();
-                    self.reporter.observe_line(&line);
-                }
-                // 单行异常超长时保留尾部，避免无限增长。
-                let cap = 1024 * 1024;
-                if self.pending.len() > cap {
-                    let drop = self.pending.len() - cap;
-                    self.pending.drain(..drop);
+                // 不压缩时直接在原始分片上观测，省掉一次整块拷贝。
+                let decoded = self.decoder.as_mut().map(|decoder| decoder.push(&chunk));
+                match decoded.as_deref() {
+                    Some(decoded) => self.observe(decoded),
+                    None => self.observe(&chunk),
                 }
                 Poll::Ready(Some(Ok(chunk)))
             }

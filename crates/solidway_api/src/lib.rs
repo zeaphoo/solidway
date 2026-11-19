@@ -185,6 +185,8 @@ impl Api {
         *self.state.usage.write().expect("usage lock") = Some(Arc::clone(&collector));
 
         core_bridge::spawn_event_pump(self.state.clone(), Arc::clone(&core), collector);
+        // 过期会话粘性条目的后台清理（热路径只做 O(1) 插入/查找）。
+        core.spawn_maintenance();
         Ok(core)
     }
 
