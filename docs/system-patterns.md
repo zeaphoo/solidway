@@ -67,6 +67,7 @@
 - 所有用户可见文案走 i18n（`zh-CN` / `en-US`），不硬编码。
 - 支持浅色 / 深色主题，以 `documentElement` 上的 `.dark` 类切换，首访取系统偏好并持久化。
 - 服务端数据用 react-query，UI 态用 zustand，职责不重叠。
+- **实时数据一律轮询，不引入推送通道**：周期刷新只用 `refetchInterval`（统一走 `web/src/lib/polling.js::pollEvery`，4xx 停表），等外部状态变化用有界顺序轮询 `pollUntil`；控制台 MUST NOT 引入 SSE / WebSocket / 长连接，也不消费数据面的 `text/event-stream`（约束见 `openspec/specs/admin-console`「实时数据获取」）。
 - **引导 / 帮助**：「快速开始」（`/welcome`）的进度一律由接口数据推导（`web/src/lib/onboardingSteps.js` 是唯一的步骤事实来源），不在本机记进度；本机 `localStorage` 只存按用户隔离的「已跳过 / 已完成」意图标记（`solidway-onboarding:v1:<userId>`）。自动进入闸门在 `AppShell`，每次加载页只判一次并 `replace`，不做路由守卫。
 - **帮助正文与 UI 文案分文件**：`locales/<lang>.json` 放界面文案，`locales/help/<lang>.json` 放帮助正文与检索关键词，`i18n.js` 合并为 `help` 命名空间；帮助分区与锚点结构在 `web/src/lib/helpContent.js`。
 - **示例代码唯一来源**：`web/src/lib/accessSnippets.js` 生成 curl / SDK / 终端 Agent 片段，路由详情页对话框与帮助中心共用 `AccessGuidePanel`，禁止在页面内拼示例字符串。接入地址归一化（`buildBaseUrls`）与「按凭据推导可用格式 / 模型」（`formatsAndModels`）也只此一份。

@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 
 import { request } from '@/lib/api'
+import { pollEvery } from '@/lib/polling'
 
 /**
  * 桌面壳偏好（仅 desktop 模式可用）。
@@ -14,7 +15,7 @@ export function useDesktopPreferences() {
     queryFn: () => request('/app/desktop'),
     staleTime: 0,
     // 同步托盘侧或其他窗口的改动（设计口径：5 秒内）。
-    refetchInterval: 5000,
+    refetchInterval: pollEvery(5000),
   })
 }
 

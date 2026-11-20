@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { request } from '@/lib/api'
+import { pollEvery } from '@/lib/polling'
 
 export function useProviderHealth() {
   return useQuery({
     queryKey: ['provider-health'],
     queryFn: () => request('/provider-health'),
-    refetchInterval: 15_000,
+    refetchInterval: pollEvery(15_000),
   })
 }
 

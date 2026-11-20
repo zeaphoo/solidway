@@ -10,6 +10,7 @@ import {
   useUpdateDesktopPreferences,
 } from '@/hooks/useDesktopPreferences'
 import { errorMessage } from '@/lib/format'
+import { pollUntil } from '@/lib/polling'
 
 // 回执轮询：壳执行通常是毫秒级，400ms × 10 足够覆盖最慢的登录项写入。
 const POLL_INTERVAL_MS = 400
@@ -43,29 +44,33 @@ export function DesktopAppSection() {
   }, [pending, prefs])
 
   // 等回执：匹配 apply_id 后收尾；超时则提示并重新拉取。
+  // 用顺序轮询（上一次取数结束后再排下一次），请求慢于 400ms 时不会重叠。
   useEffect(() => {
     if (!pending) return undefined
-    let attempts = 0
-    const timer = setInterval(async () => {
-      attempts += 1
-      const result = await refetch()
-      const status = result.data?.status
-      if (status?.apply_id && status.apply_id === pending.applyId) {
+    return pollUntil(
+      async () => {
+        const result = await refetch()
+        const status = result.data?.status
+        if (!status?.apply_id || status.apply_id !== pending.applyId) return false
         setPending(null)
         if (status.ok) {
           toast.success(t('desktop.applied'))
         } else {
           toast.error(status.error || t('desktop.applyFailed'))
         }
-        return
-      }
-      if (attempts >= POLL_ATTEMPTS) {
-        setPending(null)
-        toast.warning(t('desktop.applyTimeout'))
-        refetch()
-      }
-    }, POLL_INTERVAL_MS)
-    return () => clearInterval(timer)
+        return true
+      },
+      {
+        intervalMs: POLL_INTERVAL_MS,
+        attempts: POLL_ATTEMPTS,
+        onDone: (done) => {
+          if (done) return
+          setPending(null)
+          toast.warning(t('desktop.applyTimeout'))
+          refetch()
+        },
+      },
+    )
   }, [pending, refetch, t])
 
   const submit = (patch) => {

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { request } from '@/lib/api'
+import { pollEvery } from '@/lib/polling'
 
 function incidentSuffix(params) {
   const search = new URLSearchParams()
@@ -17,7 +18,7 @@ export function useIncidents(params = {}, enabled = true) {
     queryKey: ['provider-incidents', suffix],
     queryFn: () => request(`/provider-incidents${suffix}`),
     enabled,
-    refetchInterval: 15_000,
+    refetchInterval: pollEvery(15_000),
   })
 }
 
@@ -28,7 +29,7 @@ export function useAdminIncidents(params = {}, enabled = true) {
     queryKey: ['admin-provider-incidents', suffix],
     queryFn: () => request(`/admin/provider-incidents${suffix}`),
     enabled,
-    refetchInterval: 15_000,
+    refetchInterval: pollEvery(15_000),
   })
 }
 
@@ -52,6 +53,6 @@ export function useIncidentStats(enabled = true) {
     queryKey: ['provider-incident-stats'],
     queryFn: () => request('/provider-incidents/stats'),
     enabled,
-    refetchInterval: 30_000,
+    refetchInterval: pollEvery(30_000),
   })
 }

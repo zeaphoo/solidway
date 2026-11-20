@@ -56,6 +56,7 @@ export default function ProviderIncidentsPage() {
   const closeIncident = useCloseIncident()
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
 
+  // 纯本地时钟（不发请求）：让“3 分钟前”这类相对时间自己走。
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNow(Math.floor(Date.now() / 1000))

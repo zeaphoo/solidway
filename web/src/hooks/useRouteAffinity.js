@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { request } from '@/lib/api'
+import { pollEvery } from '@/lib/polling'
 
 /** 路由会话记录（`last_used` 策略的读取依据；其它策略下仅作诊断）。 */
 export function useRouteAffinity(routeId) {
@@ -8,7 +9,7 @@ export function useRouteAffinity(routeId) {
     queryKey: ['route-affinity', routeId],
     queryFn: () => request(`/routes/${routeId}/affinity`),
     enabled: Boolean(routeId),
-    refetchInterval: 10_000,
+    refetchInterval: pollEvery(10_000),
   })
 }
 

@@ -24,6 +24,7 @@ import { DesktopAppSection } from '@/components/system/DesktopAppSection'
 import { useSettings, useTlsRetry, useTlsStatus, useUpdateSettings } from '@/hooks/useSettings'
 import { request } from '@/lib/api'
 import { errorMessage, formatUnixCompact } from '@/lib/format'
+import { pollUntil } from '@/lib/polling'
 
 /** 只读运行信息。 */
 function SystemInfoSection() {
@@ -270,22 +271,29 @@ function NetworkSection() {
     if (data?.network) setForm({ ...data.network })
   }, [data])
 
-  // 重启后轮询直到服务恢复（本地服务，1s 足够）。
+  // 重启后轮询直到服务恢复（本地服务，1s 足够）；上一次失败后才排下一次，不重叠。
   useEffect(() => {
     if (!restarting) return undefined
-    const timer = setInterval(async () => {
-      try {
-        const info = await request('/app/info')
-        if (info?.listen) {
+    return pollUntil(
+      async () => {
+        try {
+          const info = await request('/app/info')
+          return Boolean(info?.listen)
+        } catch {
+          /* 服务尚未恢复 */
+          return false
+        }
+      },
+      {
+        intervalMs: 1000,
+        onDone: (done) => {
+          if (!done) return
           setRestarting(false)
           toast.success(t('settings.restartDone'))
           window.location.reload()
-        }
-      } catch {
-        /* 服务尚未恢复 */
-      }
-    }, 1000)
-    return () => clearInterval(timer)
+        },
+      },
+    )
   }, [restarting, t])
 
   const listen = appInfo.data?.listen

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { request } from '@/lib/api'
+import { shouldKeepPolling } from '@/lib/polling'
 
 export function useSettings(enabled = true) {
   return useQuery({ queryKey: ['settings'], queryFn: () => request('/settings'), enabled })
@@ -18,6 +19,7 @@ export function useTlsStatus(enabled = true) {
     enabled,
     staleTime: 0,
     refetchInterval: (query) => {
+      if (!shouldKeepPolling(query.state.error)) return false
       const state = query.state.data?.cert?.state
       // 等待签发 / 已暂停时持续轮询，证书可用后放慢。
       return state === 'ok' ? 30_000 : 5_000

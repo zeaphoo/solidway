@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { request } from '@/lib/api'
+import { pollEvery } from '@/lib/polling'
 
 function qs(params) {
   const search = new URLSearchParams()
@@ -33,7 +34,7 @@ export function useUsageSummary(params) {
   return useQuery({
     queryKey: ['usage', 'summary', ...commonKey(params)],
     queryFn: () => request(`${endpoint(params.scope, 'summary')}${qs(clean(params))}`),
-    refetchInterval: REFETCH_MS,
+    refetchInterval: pollEvery(REFETCH_MS),
     enabled: params.enabled !== false,
   })
 }
@@ -42,7 +43,7 @@ export function useUsageTimeseries(params) {
   return useQuery({
     queryKey: ['usage', 'timeseries', ...commonKey(params)],
     queryFn: () => request(`${endpoint(params.scope, 'timeseries')}${qs(clean(params))}`),
-    refetchInterval: REFETCH_MS,
+    refetchInterval: pollEvery(REFETCH_MS),
     enabled: params.enabled !== false,
   })
 }
@@ -51,7 +52,7 @@ export function useUsageBreakdown(params) {
   return useQuery({
     queryKey: ['usage', 'breakdown', ...commonKey(params)],
     queryFn: () => request(`${endpoint(params.scope, 'breakdown')}${qs(clean(params))}`),
-    refetchInterval: REFETCH_MS,
+    refetchInterval: pollEvery(REFETCH_MS),
     enabled: params.enabled !== false,
   })
 }
@@ -60,7 +61,7 @@ export function useUsageRequests(params) {
   return useQuery({
     queryKey: ['usage', 'requests', ...commonKey(params)],
     queryFn: () => request(`${endpoint(params.scope, 'requests')}${qs(clean(params))}`),
-    refetchInterval: REFETCH_MS,
+    refetchInterval: pollEvery(REFETCH_MS),
     enabled: params.enabled !== false,
   })
 }

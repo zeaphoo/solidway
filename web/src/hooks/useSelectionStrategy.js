@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { request } from '@/lib/api'
+import { pollEvery } from '@/lib/polling'
 
 /** 路由选号策略 + 实时指标快照（10 秒刷新）。 */
 export function useSelectionStrategy(routeId) {
@@ -8,7 +9,7 @@ export function useSelectionStrategy(routeId) {
     queryKey: ['selection-strategy', routeId],
     queryFn: () => request(`/routes/${routeId}/selection-strategy`),
     enabled: Boolean(routeId),
-    refetchInterval: 10_000,
+    refetchInterval: pollEvery(10_000),
   })
 }
 

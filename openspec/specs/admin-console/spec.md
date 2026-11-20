@@ -301,6 +301,32 @@ Provider 列表 MUST 只展示凭据掩码，SHALL NOT 展示或请求明文。�
 - **WHEN** 请求失败且无统一错误体
 - **THEN** 控制台展示通用错误提示，SHALL NOT 崩溃或白屏
 
+### Requirement: 实时数据获取（轮询，不引入推送通道）
+
+控制台的「实时」数据 SHALL 由带间隔的轮询提供：周期刷新 MUST 统一走 react-query 的 `refetchInterval`（`web/src/lib/polling.js::pollEvery`）。
+
+控制台 MUST NOT 引入 SSE / WebSocket / 其它长连接推送通道，也 MUST NOT 消费数据面的 `text/event-stream` 端点；所有数据 MUST 来自 `/api/*` 的普通 JSON 响应（同一份接口同时服务浏览器、桌面 webview 与反向代理）。
+
+- 轮询 MUST 在 4xx 响应时停表（确定性失败，继续轮询只会重放同一份错误），MUST 在后续成功取数后自动恢复；
+- 「等外部状态变化」的一次性等待（桌面壳回执、重启后服务恢复）MUST 使用有界、顺序的轮询（`pollUntil`）：上一次取数结束后才发起下一次，MUST NOT 因请求慢于间隔而重叠；
+- 刷新间隔 MUST 与数据语义匹配（指标 / 故障 10–30 秒、用量 15 秒、TLS 待签发 5 秒），MUST NOT 以高频轮询模拟实时推送。
+
+#### Scenario: 4xx 时停表
+- **WHEN** 某轮询接口返回 401 / 403 / 422
+- **THEN** 控制台停止该接口的周期请求，不因轮询反复弹出同一错误
+
+#### Scenario: 会话恢复后自动续轮询
+- **WHEN** 停表的查询在用户重新登录或手动刷新后成功取数
+- **THEN** 该接口恢复原间隔周期刷新
+
+#### Scenario: 等待回执不重叠
+- **WHEN** 桌面壳回执的单次请求耗时超过轮询间隔
+- **THEN** 控制台等上一次请求结束后再发起下一次，回执处理不超过设定的尝试次数
+
+#### Scenario: 控制台不消费流式端点
+- **WHEN** 控制台展示用量、故障、健康或会话记录
+- **THEN** 数据只来自 `/api/*` 的普通 JSON 响应，不建立任何 `text/event-stream` 连接
+
 ### Requirement: 控制台外壳
 
 控制台 SHALL 采用「固定侧栏 + 顶部栏 + 主内容区」的布局，侧栏 SHALL NOT 折叠。
