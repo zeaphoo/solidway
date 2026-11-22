@@ -6,113 +6,152 @@
 
 # Solidway
 
-**A Rust LLM gateway that forwards requests unchanged.**
+**Your team's LLM accounts, behind one local endpoint.**
 
-Solidway sits between your application and your model providers. Request bodies, response bodies and streaming frame boundaries travel through it byte for byte, while failover, account health and usage attribution run alongside the forward path.
-
-It is built for a specific shape of deployment: an organization owns a set of model accounts, puts them in a pool, and lets its own employees and scripts share them. Accounts belong to you; Solidway never sells access to models.
+Solidway is a desktop app for Linux, Windows and macOS. It runs a local LLM gateway, keeps your
+upstream credentials encrypted on this machine, and gives every app — scripts, IDEs, agents and
+notebooks — one endpoint with account pooling, failover, API keys and usage attribution.
 
 [![CI](https://github.com/zeaphoo/solidway/actions/workflows/ci.yml/badge.svg)](https://github.com/zeaphoo/solidway/actions/workflows/ci.yml)
 
----
+<p align="center">
+  <img src="docs/screenshots/en/dashboard.png" alt="Solidway global usage dashboard" width="100%">
+</p>
 
-## Contents
+## Install and first run
 
-- [Features](#features)
-- [What Solidway does not do](#what-solidway-does-not-do)
-- [Failure classification](#failure-classification)
-- [Comparison with other gateways](#comparison-with-other-gateways)
-- [Distribution](#distribution)
-- [Status](#status)
-- [License](#license)
-- [Further reading](#further-reading)
+Download the installer for your platform from the
+[latest release](https://github.com/zeaphoo/solidway/releases/latest). The desktop app bundles the
+gateway — there is nothing else to install.
 
----
+1. Launch **Solidway**. It starts the gateway on this machine and opens the console.
+2. Set the administrator password when prompted.
+3. Create a **route** — the single endpoint your clients will call.
+4. Add one or more **provider credentials** to the route. Each credential is one upstream account;
+   two or more accounts in a route let Solidway fail over automatically.
+5. Create an **API key** for the route and copy it immediately. The plaintext is shown once.
+6. Point your client at the Base URL shown on the route page and authenticate with that key.
 
-## Features
+<p align="center">
+  <img src="docs/screenshots/en/quick-start.png" alt="Solidway quick start checklist" width="100%">
+</p>
 
-### Forwarding
+The Quick start checklist tracks the same steps and stays available from the sidebar. The built-in
+Help center covers concepts, client snippets and troubleshooting.
 
-- Three inbound protocol families, each forwarded on its own terms: OpenAI Chat Completions (`/v1/chat/completions`), OpenAI Responses (`/v1/responses`), Anthropic Messages (`/v1/messages`).
-- Request and response bodies preserved byte for byte, with one exception: the top-level `model` field is rewritten when a credential maps a client-facing alias to a different upstream id. No prompt rewriting, so provider prompt caches keep working.
-- Streaming frames pass through with their original chunk boundaries.
-- No cross-protocol translation on the forward path: a client speaks the dialect its provider expects.
+## Connect a client
 
-### Reliability
+The default Base URL is `http://127.0.0.1:6565/v1`. Copy the key from the route page and make a
+request:
 
-- **Pooled accounts** — a route is a pool of provider credentials. Selection is weighted and health-aware (observed latency, error rate, cooldown state) rather than a fixed table.
-- **Failover before the first byte** — if a response has not started, the gateway switches to another credential and the client never sees the failed attempt.
-- **Failure classification** — a rejected credential (`401`) retires an account until an operator restores it; rate limits, exhausted quota and access errors put it into a timed cooldown. Errors caused by the request itself never remove an account from rotation.
-- **Probing** — held-out accounts are checked by a probe and return to rotation on their own once they can serve again.
+```bash
+export SOLIDWAY_KEY="sw-..."
 
-### Operations
+curl http://127.0.0.1:6565/v1/chat/completions \
+  -H "Authorization: Bearer $SOLIDWAY_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.2",
+    "messages": [{ "role": "user", "content": "Hello" }]
+  }'
+```
 
-- **Self-hosted, one static binary** — data plane and management plane are one process with the console embedded. No external control plane is contacted at runtime.
-- **Console** — routes, provider credentials (masked, encrypted at rest), API keys, per-route and global usage, incidents, users, system settings and built-in TLS. Chinese and English.
-- **Usage attribution** — requests, tokens, latency and error rate broken down by route, API key, provider, model and owner, so spend can be attributed to the team that produced it.
-- **Incidents and alerts** — provider failures are recorded with duration and attempt counts; alerts are delivered to a webhook with retry and per-provider throttling.
-- **Built-in HTTPS** — certificates issued and renewed through ACME (`http-01` or `tls-alpn-01`) for domains you configure, or terminate TLS in front of Solidway.
-- **Provider catalog** — presets generated from models.dev, including endpoint templates for Vertex, Azure and Bedrock (SigV4), with model discovery from the upstream.
+OpenAI Chat Completions, OpenAI Responses and Anthropic Messages all share the same listener. Use
+the Base URL and API key shown on the route page. Anthropic SDKs and Claude Code expect the root
+without the trailing `/v1`; the route page's examples fill in the right value for each client.
+Existing SDKs that speak one of these protocols work without code changes.
 
-## What Solidway does not do
+<p align="center">
+  <img src="docs/screenshots/en/connect.png" alt="Route page with Base URL, API key and models" width="100%">
+</p>
 
-- **No schema translation.** If you want to call Claude through the OpenAI SDK, this is the wrong tool.
-- **No content moderation, no prompt rewriting, no response rewriting.**
-- **No resale of model access.** It is a gateway for accounts you already own.
-- **No container images, no Prometheus/OTLP exporter, no email/Slack alerting (webhook only).** See [Status](#status).
+## Core concepts
 
-## Failure classification
+| Object | What it means |
+|---|---|
+| **Route** | A stable entry point backed by a pool of upstream accounts. Clients only know the route. |
+| **Provider credential** | One upstream account (API key, service account or AWS credentials). Stored encrypted and shown masked. |
+| **API key** | The caller's credential, bound to exactly one route. Revoke or rotate it without touching provider accounts. |
+| **Priority tier** | Credentials are tried by tier first. Higher tiers are preferred; lower tiers are the fallback. |
 
-| Class | Retry | Hold |
-|---|---|---|
-| Transient (network, 5xx) | Same target, with backoff | No |
-| Rate limit | Rotate credential | Yes, timed cooldown |
-| Credential rejected (401) | Rotate credential, no backoff | Yes, until an operator restores it |
-| Quota exhausted | Rotate credential, no backoff | Yes, timed cooldown |
-| Model not accessible | Rotate credential, no backoff | Yes, for that model |
-| Request rejected by provider | No | No |
+## What you can do
 
-## Comparison with other gateways
+### Pool accounts and fail over
 
-| | Solidway | LiteLLM | Bifrost |
-|---|---|---|---|
-| Primary goal | Forward unchanged | Unified schema | Unified schema + governance |
-| Language | Rust | Python | Go |
-| Calls vendor A with vendor B's SDK | Not supported, by design | Supported | Supported |
-| Adding a provider | Configuration change | Adapter code | Adapter code |
-| Failover | Built in | Built in | Built in |
-| Load balancing | Built in, health-aware | Built in | Built in |
-| Circuit breaking | Built in | Commercial edition | Deployment cooldown |
-| Deployment shape | One static binary | Service or container | Binary or container |
+Add several credentials to a route and pick a selection strategy: round robin, last used, fastest
+response, highest throughput, or a weighted blend of uptime, latency and throughput. Health is
+tracked continuously: a rejected credential is retired until you restore it, rate limits and quota
+errors enter a timed cooldown, and request errors never remove an account. If a response has not
+started yet, Solidway switches accounts silently — the client never sees the failed attempt.
 
-Sources: Bifrost and LiteLLM project documentation, reviewed October 2026. Products change; check their docs before deciding.
+<p align="center">
+  <img src="docs/screenshots/en/provider-pool.png" alt="Provider pool with health, faults and priorities" width="100%">
+</p>
 
-## Distribution
+### Attribute usage
 
-- **Server** — one static binary, distributed as `deb` and `rpm` packages with a systemd unit, or run from the release archive. Linux.
-- **Desktop** — a Tauri application for Linux, Windows and macOS that supervises the gateway locally and opens the console in a webview; each package ships the gateway binary.
-- **Upgrades** — settings, accounts and usage live in a local SQLite database, so upgrading means replacing the binary or package.
+See requests, errors, tokens, cache hits, latency and failovers by route, API key, model, provider
+or owner. Switch between 24 hours, 7 days, 30 days or a custom range, then inspect recent requests
+and their individual attempts.
+
+<p align="center">
+  <img src="docs/screenshots/en/usage-breakdown.png" alt="Usage breakdown by route and recent requests" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/en/global-breakdown.png" alt="Global usage broken down by user" width="100%">
+</p>
+
+### Catch provider trouble early
+
+Provider failures become incidents with duration, attempt counts and severity. Open issues,
+cooldowns and retired credentials are visible in one place, and alerts can be delivered to a webhook.
+
+<p align="center">
+  <img src="docs/screenshots/en/incidents.png" alt="Provider incidents and health history" width="100%">
+</p>
+
+### Share without sharing credentials
+
+Admins manage users, routes and system settings. Route owners get their own API keys and usage
+view without seeing anyone else's routes or upstream credentials. Provider secrets are encrypted at
+rest and only ever displayed masked.
+
+## Desktop behavior
+
+Solidway lives in the system tray. Closing the window can keep the gateway running in the
+background; the tray menu reopens the console, restarts the gateway, toggles autostart and
+close-to-tray, or quits the app. Quitting from the tray stops the gateway.
+
+## Local-first by design
+
+Routes, credentials, users, API keys and usage live in a local SQLite database. The gateway talks to
+your provider accounts directly and does not contact a cloud control plane. Back up the app's data
+folder together with its master key — without the master key, stored provider credentials cannot be
+decrypted.
+
+## Good to know
+
+- **No protocol translation.** A client must speak the dialect its provider expects; Solidway
+  forwards request and response bodies unchanged.
+- **No prompt or response rewriting.** Only the top-level model alias is rewritten when a credential
+  maps a client-facing name to a different upstream id.
+- **No resale of model access.** Solidway pools accounts you already own.
+- **Webhook alerts only.** No email or Slack integration yet.
 
 ## Status
 
 | | |
 |---|---|
 | Version | `0.5.0-rc.2`, pre-1.0 — interfaces may change between minor releases |
-| Source | Complete implementation in this repository |
-| Platforms | Linux (server + desktop), macOS (desktop), Windows (desktop) |
+| Platforms | Linux, macOS and Windows desktop |
 | License | Apache-2.0 |
-| Not yet available | Container images, Prometheus/OTLP, email/Slack alerting, cross-protocol transcode wiring, code signing/notarization |
 
-## License
-
-Apache-2.0. You can run, modify, self-host and redistribute it, including as part of a closed-source product, provided you keep the copyright and license notices and comply with the patent and attribution terms. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
-
-The license does not grant trademark rights; the Solidway name and logo remain with their respective owners.
+Released under the Apache-2.0 license. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
 
 ## Further reading
 
-- [Getting started](docs/getting-started.md) — build, run, deploy, desktop packages, data directory and backups
-- [Architecture](docs/architecture.md) — process layout, crates, data model
+- [Architecture](docs/architecture.md) — process layout, crates and data model
 - [Changelog](CHANGELOG.md) — user-visible changes per release
 - [Contributing](CONTRIBUTING.md) — development workflow and required checks
-- [Design decisions](docs/adr/), [domain glossary](docs/domain-context.md), [behaviour specs](openspec/specs/)
+- Built-in **Help center** — concepts, common tasks, client snippets and troubleshooting
